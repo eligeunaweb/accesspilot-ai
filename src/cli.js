@@ -10,10 +10,11 @@ import { auditProject, projectExitCode } from './runner.js';
 import { renderProject } from './project-report.js';
 import { compareAudits, loadSnapshot } from './comparison.js';
 import { messages } from './i18n.js';
-import { saveHistory, latestHistory, listHistory } from './history.js';
+import { saveHistory, latestHistory, listHistory, pruneHistory } from './history.js';
 
 function usage() {
   console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--baseline prior.json|latest] [--history directory] [--list-history] [--output filename] [--fail-on-violations]');
+  console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
 }
 export async function main(args=process.argv.slice(2)) {
   let opts;
@@ -27,6 +28,7 @@ export async function main(args=process.argv.slice(2)) {
       const project = await loadProject(opts.project);
       if (opts.lang) project.language = opts.lang;
       if (opts.listHistory) { console.log(JSON.stringify(await listHistory(opts.history, project), null, 2)); return 0; }
+      if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const run = await auditProject(project, {signal:controller.signal});
       if (baseline) run.comparison = compareAudits(baseline, run);

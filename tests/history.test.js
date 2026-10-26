@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile, readdir, mkdir, rmdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { saveHistory, listHistory, latestHistory, projectKey } from '../src/history.js';
+import { saveHistory, listHistory, latestHistory, projectKey, pruneHistory } from '../src/history.js';
 import { compareAudits } from '../src/comparison.js';
 
 function run() {
@@ -49,4 +49,60 @@ test('invalid snapshots leave no published history',async t=>{
   const root=await fixture(t),input=run(); input.pages=[];
   await assert.rejects(saveHistory(root,input),/page count/);
   assert.deepEqual(await listHistory(root,input.project),[]);
+});
+
+test('retention previews then deletes only older project records and is idempotent',async t=>{
+  const root=await fixture(t),input=run(),other={...input,project:{...input.project,name:'Other'}};
+  await saveHistory(root,other);
+  await Promise.all(Array.from({length:5},()=>saveHistory(root,input)));
+  const before=await listHistory(root,input.project),path=join(root,projectKey(input.project));
+  await writeFile(join(path,'notes.json'),'keep this');
+  await writeFile(join(path,'.incomplete.tmp'),'partial');
+  const preview=await pruneHistory(root,input.project,{keep:2});
+  assert.equal(preview.applied,false);assert.deepEqual(preview.deleted,[]);
+  assert.deepEqual(preview.candidates,before.slice(2));
+  assert.deepEqual(await listHistory(root,input.project),before);
+  const applied=await pruneHistory(root,input.project,{keep:2,apply:true});
+  assert.deepEqual(applied.deleted,preview.candidates);
+  assert.deepEqual(await listHistory(root,input.project),before.slice(0,2));
+  assert.equal((await listHistory(root,other.project)).length,1);
+  assert.equal(await readFile(join(path,'notes.json'),'utf8'),'keep this');
+  assert.equal(await readFile(join(path,'.incomplete.tmp'),'utf8'),'partial');
+  assert.deepEqual((await pruneHistory(root,input.project,{keep:2,apply:true})).deleted,[]);
+});
+
+test('retention refuses corrupt or foreign records before deleting any file',async t=>{
+  const root=await fixture(t),input=run();
+  await Promise.all(Array.from({length:3},()=>saveHistory(root,input)));
+  const ids=await listHistory(root,input.project),path=join(root,projectKey(input.project),ids.at(-1));
+  await writeFile(path,'broken');
+  await assert.rejects(pruneHistory(root,input.project,{keep:1,apply:true}),/valid JSON/);
+  assert.deepEqual(await listHistory(root,input.project),ids);
+  const foreign=run();foreign.project.name='Another';
+  await writeFile(path,JSON.stringify(foreign));
+  await assert.rejects(pruneHistory(root,input.project,{keep:1,apply:true}),/another project/);
+  assert.deepEqual(await listHistory(root,input.project),ids);
+});
+
+test('invalid retention cannot delete the final record',async t=>{
+  const root=await fixture(t),input=run();await saveHistory(root,input);
+  for(const keep of [0,-1,1.5,'2',10001,undefined]) await assert.rejects(pruneHistory(root,input.project,{keep,apply:true}),/keep/);
+  await assert.rejects(pruneHistory(root,input.project,{keep:1,apply:'yes'}),/boolean/);
+  assert.equal((await listHistory(root,input.project)).length,1);
+});
+
+test('abandoned lock fails closed without breaking another process lock', {timeout:10000},async t=>{
+  const root=await fixture(t),input=run();await saveHistory(root,input);
+  const lock=join(root,projectKey(input.project),'.history-lock');await mkdir(lock);
+  await assert.rejects(pruneHistory(root,input.project,{keep:1,apply:true}),/abandoned/);
+  assert.deepEqual(await readdir(lock),[]);
+  await rmdir(lock);
+  assert.equal((await listHistory(root,input.project)).length,1);
+});
+
+test('concurrent saving and retention leave valid loadable history',async t=>{
+  const root=await fixture(t),input=run();await saveHistory(root,input);
+  await Promise.all([saveHistory(root,input),pruneHistory(root,input.project,{keep:1,apply:true}),saveHistory(root,input)]);
+  assert.ok((await listHistory(root,input.project)).length>=1);
+  assert.equal(compareAudits(await latestHistory(root,input.project),input).totals.persistent,1);
 });

@@ -11,3 +11,12 @@ test('history options require an explicit project and store',()=>{
   for(const args of [['https://example.org','--history','store'],['--project','p.json','--baseline','latest'],['--project','p.json','--list-history']]) assert.throws(()=>parse(args));
   assert.equal(parse(['--project','p.json','--history','my store','--baseline','latest']).history,'my store');
 });
+test('retention requires explicit, bounded and unambiguous maintenance options',()=>{
+  const base=['--project','p.json','--history','store','--prune-history'];
+  for(const value of ['0','-1','1.5','01','1e2','10001','NaN']) assert.throws(()=>parse([...base,'--keep-runs',value]));
+  assert.throws(()=>parse(base));
+  assert.throws(()=>parse(['--project','p.json','--apply-retention']));
+  for(const extra of [['--list-history'],['--output','x.json'],['--baseline','latest'],['--format','json'],['--fail-on-violations']]) assert.throws(()=>parse([...base,'--keep-runs','2',...extra]));
+  assert.equal(parse([...base,'--keep-runs','2']).applyRetention,undefined);
+  assert.equal(parse([...base,'--keep-runs','2','--apply-retention']).keepRuns,2);
+});

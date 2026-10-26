@@ -83,6 +83,14 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
     assert.ok(JSON.parse(next.out).comparison.totals.persistent>=2);
     const listed=await run(['--project',config,'--history',history,'--list-history']);
     assert.equal(listed.code,0,listed.err);assert.equal(JSON.parse(listed.out).length,2);
+    const retention=['--project',config,'--history',history,'--prune-history','--keep-runs','1'];
+    const preview=await run(retention);assert.equal(preview.code,0,preview.err);
+    assert.equal(JSON.parse(preview.out).candidates.length,1);
+    assert.equal(JSON.parse(preview.out).deleted.length,0);
+    const applied=await run([...retention,'--apply-retention']);assert.equal(applied.code,0,applied.err);
+    assert.equal(JSON.parse(applied.out).deleted.length,1);
+    const remaining=await run(['--project',config,'--history',history,'--list-history']);
+    assert.equal(remaining.code,0,remaining.err);assert.equal(JSON.parse(remaining.out).length,1);
   });
   await t.test('real navigation timeout returns a failed audit',async()=>{
     await assert.rejects(auditPage(url+'/slow',{timeoutMs:1000}),/timed out|Timeout/);

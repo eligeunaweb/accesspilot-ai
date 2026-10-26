@@ -4,10 +4,12 @@ export function parse(args) {
   const opts = {format:'text', output:null, fail:false, url:null, project:null};
   for(let i=0;i<args.length;i++) {
     const arg=args[i];
-    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--lang' || arg==='--baseline' || arg==='--history') {
+    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs') {
       if(!args[i+1] || args[i+1].startsWith('--')) throw new Error(`Missing value for ${arg}`);
       opts[arg.slice(2)]=args[++i];
     } else if(arg==='--list-history') opts.listHistory=true;
+    else if(arg==='--prune-history') opts.pruneHistory=true;
+    else if(arg==='--apply-retention') opts.applyRetention=true;
     else if(arg==='--fail-on-violations') opts.fail=true;
     else if(arg.startsWith('-')) throw new Error(`Unknown option: ${arg}`);
     else if(opts.url) throw new Error('Only one URL is supported');
@@ -21,6 +23,15 @@ export function parse(args) {
   if(opts.history && !opts.project) throw new Error('--history requires --project');
   if(opts.listHistory && (!opts.project || !opts.history)) throw new Error('--list-history requires --project and --history');
   if(opts.baseline==='latest' && !opts.history) throw new Error('--baseline latest requires --history');
+  if(opts.pruneHistory) {
+    if(!opts.project || !opts.history) throw new Error('--prune-history requires --project and --history');
+    if(!/^[1-9]\d{0,4}$/.test(opts['keep-runs'] ?? '') || Number(opts['keep-runs'])>10000) throw new Error('--keep-runs must be an integer between 1 and 10000');
+    opts.keepRuns=Number(opts['keep-runs']);
+  } else if(opts['keep-runs']!==undefined || opts.applyRetention) throw new Error('--keep-runs and --apply-retention require --prune-history');
+  if(opts.listHistory || opts.pruneHistory) {
+    if(opts.listHistory && opts.pruneHistory) throw new Error('Choose --list-history or --prune-history');
+    if(opts.baseline || opts.output || opts.fail || opts.format!=='text') throw new Error('History maintenance cannot be combined with audit output or baseline options');
+  }
   if(opts.project) return opts;
   let url;
   try {url=new URL(opts.url);} catch {throw new Error('Invalid URL');}

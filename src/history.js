@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, open, rename, unlink, readdir, lstat } from 'node:fs/promises';
+import { mkdir, open, rename, unlink, readdir, lstat, rmdir } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { join, resolve } from 'node:path';
 import { validateProject } from './project.js';
 import { validateSnapshot, loadSnapshot } from './comparison.js';
@@ -18,36 +19,74 @@ async function directory(root, project) {
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('History project path must be a real directory');
   return path;
 }
+async function locked(root, project, action) {
+  const path = await directory(root, project);
+  const lock = join(path, '.history-lock');
+  const deadline = Date.now() + 5000;
+  while (true) {
+    try { await mkdir(lock, {mode:0o700}); break; }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      if (Date.now() >= deadline) throw new Error('History is busy or has an abandoned .history-lock; stop other history processes before removing the lock');
+      await delay(25);
+    }
+  }
+  try { return await action(path); }
+  finally { await rmdir(lock); }
+}
 export async function saveHistory(root, run) {
   // Whitelist comparison evidence. Never persist HTML, errors or arbitrary report fields.
   const snapshot = validateSnapshot(run);
   const data = JSON.stringify(snapshot);
   if (Buffer.byteLength(data) > 20 * 1024 * 1024) throw new Error('History snapshot exceeds 20 MiB');
-  const path = await directory(root, snapshot.project);
-  const id = `${new Date().toISOString().replace(/[:.]/g, '-')}_${randomUUID()}.json`;
-  const pending = join(path, `.${id}.tmp`);
-  let file;
-  try {
-    file = await open(pending, 'wx', 0o600);
-    await file.writeFile(data, 'utf8');
-    await file.sync();
-    await file.close(); file = null;
-    await rename(pending, join(path, id));
-    return id;
-  } finally {
-    if (file) await file.close();
-    await unlink(pending).catch(error => { if (error.code !== 'ENOENT') throw error; });
-  }
+  return locked(root, snapshot.project, async path => {
+    const id = `${new Date().toISOString().replace(/[:.]/g, '-')}_${randomUUID()}.json`;
+    const pending = join(path, `.${id}.tmp`);
+    let file;
+    try {
+      file = await open(pending, 'wx', 0o600);
+      await file.writeFile(data, 'utf8');
+      await file.sync();
+      await file.close(); file = null;
+      await rename(pending, join(path, id));
+      return id;
+    } finally {
+      if (file) await file.close();
+      await unlink(pending).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    }
+  });
 }
-export async function listHistory(root, project) {
-  const path = await directory(root, project);
+async function records(path) {
   const entries = await readdir(path, { withFileTypes: true });
   return entries.filter(entry => entry.isFile() && /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z_[a-f0-9-]{36}\.json$/.test(entry.name))
     .map(entry => entry.name).sort().reverse();
 }
+export async function listHistory(root, project) {
+  return locked(root, project, records);
+}
 export async function latestHistory(root, project) {
-  const ids = await listHistory(root, project);
-  if (!ids.length) return null;
-  // Corruption fails closed: never silently compare against an older successful run.
-  return loadSnapshot(join(resolve(root), projectKey(project), ids[0]));
+  return locked(root, project, async path => {
+    const ids = await records(path);
+    if (!ids.length) return null;
+    // Corruption fails closed: never silently compare against an older successful run.
+    return loadSnapshot(join(path, ids[0]));
+  });
+}
+
+// Preview by default. Deletion is scoped to validated records of one named project.
+export async function pruneHistory(root, project, {keep, apply=false} = {}) {
+  if (!Number.isInteger(keep) || keep < 1 || keep > 10000) throw new Error('keep must be an integer between 1 and 10000');
+  if (typeof apply !== 'boolean') throw new Error('apply must be boolean');
+  return locked(root, project, async path => {
+    const ids = await records(path);
+    // Validate the complete plan before deleting anything. Corruption needs review.
+    for (const id of ids) {
+      const snapshot = await loadSnapshot(join(path, id));
+      if (projectKey(snapshot.project) !== projectKey(project)) throw new Error('History record belongs to another project');
+    }
+    const retained = ids.slice(0, keep), removed = ids.slice(keep);
+    if (apply) for (const id of removed) await unlink(join(path, id));
+    return {schemaVersion:1, kind:'history-retention', applied:apply, keep, retained,
+      candidates:removed, deleted:apply ? removed : []};
+  });
 }
