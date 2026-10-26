@@ -134,3 +134,30 @@ Native matrix results after that setup change must be checked on the new commit.
   Power-loss, network filesystem semantics and hostile local writers are outside
   these guarantees. Automatic scheduled/age/size retention is not implemented.
 
+# Read-only history viewer / Visor del historial — 2026-10-26
+
+- Full local suite: **168 passed, 0 failed, 0 skipped**, 26.58 seconds,
+  Windows / Node 24.11.1. No new dependencies.
+- Command: `node --import ./tests/helpers/outer-sandbox.js --test` with installed
+  workspace PLAYWRIGHT_BROWSERS_PATH, writable workspace TEMP/TMP and
+  ACCESSPILOT_TEST_OUTER_SANDBOX=1. Network permission enabled local HTTP fixtures.
+  This host still needs the documented test-only Chromium launch adapter;
+  production sandbox startup and the new commit's native CI remain separate checks.
+- HTTP tests: secret session path, exact Host, Origin, Fetch Metadata, GET-only,
+  strict parameters including prototype-name language inputs, traversal/foreign
+  record refusal, validated JSON attachments, corruption errors without local
+  paths, empty history, pagination, complete export despite display truncation,
+  independent tokens, and shutdown with an incomplete HTTP connection.
+- Real Chromium/axe: ES/EN history views, run details, comparison, keyboard
+  navigation and details expansion, comparison form submission, escaped malicious
+  project/selector text and no horizontal overflow at a 375 px comparison viewport.
+  The CLI subprocess started the viewer with an unreachable configured audit URL
+  without auditing it. Fixture screenshot contains deliberate escaped XSS text.
+- Found and corrected during testing: axe required an explicit browser context;
+  comparison headings skipped a level; a forcefully closed incomplete socket can
+  report expected ECONNRESET on Windows. None were skipped or suppressed in product.
+- Not validated: manual screen-reader/user workflows, large-history resource
+  benchmarks, hostile local processes, independent security review or a job API.
+  Audit execution from the web is intentionally outside this phase and still needs
+  OS/network service isolation. See HISTORY-VIEWER.md for boundaries and UI limits.
+

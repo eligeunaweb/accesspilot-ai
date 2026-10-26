@@ -64,7 +64,8 @@ No se rompen bloqueos automáticamente. Los clientes de versiones antiguas no
 participan en este protocolo: no los ejecute contra el mismo historial a la vez.
 Los temporales abandonados se pueden borrar con la aplicación detenida.
 La retención no se ejecuta al guardar; programación automática, retención por edad
-o espacio, importación, migraciones de futuros esquemas y visor web siguen pendientes.
+o espacio, importación y migraciones de futuros esquemas siguen pendientes.
+El visor web local de solo lectura está documentado en HISTORY-VIEWER.md.
 
 ## English
 
@@ -109,4 +110,5 @@ not honor this protocol and must not share the store concurrently. Remove abando
 temporary files only while the app is stopped.
 
 Retention does not run automatically on save. Scheduled/age/size-based retention,
-import, future-schema migration and a web viewer remain roadmap work.
+import and future-schema migration remain roadmap work. The read-only local web
+viewer is documented in HISTORY-VIEWER.md.

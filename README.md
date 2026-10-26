@@ -202,6 +202,9 @@ test environment exceptions and remaining deployment gates.
 Use `--project config.json --history .accesspilot-history --baseline latest` to
 save comparison evidence and compare the previous run automatically.
 Use `--list-history` with the same project and history directory to list saved runs.
+Open the local read-only web viewer with `--serve-history` and the same project
+and history options. Open the session URL printed in the terminal; stop with Ctrl+C.
+See [viewer guide / guía del visor](docs/HISTORY-VIEWER.md).
 Preview count-based retention with `--prune-history --keep-runs 30`; add
 `--apply-retention` to apply it. Maintenance never launches the browser.
 See [history documentation / documentación del historial](docs/HISTORY.md) for
