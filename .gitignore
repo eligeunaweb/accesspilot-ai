@@ -9,3 +9,4 @@ pagina-prueba.html
 *.bak
 *.log
 .env
+.accesspilot-history/

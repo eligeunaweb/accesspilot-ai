@@ -197,3 +197,10 @@ These are application HTTP(S) controls, not an OS firewall, protection against a
 browser/OS exploit, or approval to expose an audit service to untrusted callers.
 See [network design and validation](docs/NETWORK-CRAWLING.md) for exact limits,
 test environment exceptions and remaining deployment gates.
+# Local history / Historial local
+
+Use `--project config.json --history .accesspilot-history --baseline latest` to
+save comparison evidence and compare the previous run automatically.
+Use `--list-history` with the same project and history directory to list saved runs.
+See [history documentation / documentación del historial](docs/HISTORY.md) for
+privacy, storage guarantees and remaining limitations.

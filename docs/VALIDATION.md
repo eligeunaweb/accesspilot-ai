@@ -96,3 +96,24 @@ because AppArmor denied Chromium user namespaces. macOS/Node 22 on the same run
 passed the strict tests. The subsequent CI-only fix grants namespaces to exact
 installed Chromium paths; generator path/injection checks were executed locally.
 Native matrix results after that setup change must be checked on the new commit.
+# Local history validation / Validación del historial — 2026-10-26
+
+- 153 tests passed, 0 failed, 0 skipped, 23.72 seconds, Windows / Node 24.11.1.
+- Real Chromium + axe CLI processes saved two runs, compared the latest evidence
+  and listed both records. Unit tests covered concurrent writes, incomplete-file
+  exclusion, project separation, evidence minimization, corruption and schema errors.
+- Command: `node --import ./tests/helpers/outer-sandbox.js --test` with
+  `ACCESSPILOT_TEST_OUTER_SANDBOX=1`, `PLAYWRIGHT_BROWSERS_PATH` set to the installed
+  workspace browser cache, and TEMP/TMP set to a writable workspace test directory.
+- Initial executions failed due to sandbox temporary-file rename restrictions,
+  missing browser-cache configuration and denied loopback access. After granting
+  network permission and configuring the test paths, the entire suite passed.
+  No product network/sandbox controls were disabled by the implementation.
+- The existing test-only browser launcher adapter remains necessary in this host.
+  This result does not verify Chromium's nested sandbox, native macOS/Linux,
+  power-loss recovery, network-filesystem atomicity or Windows ACL isolation.
+  Native CI for this new history commit must be checked separately.
+- Manual screen-reader/user tests, configurable retention, full anonymization,
+  future-schema migrations and the history web viewer remain unimplemented or
+  unvalidated. See HISTORY.md for storage/privacy guarantees.
+
