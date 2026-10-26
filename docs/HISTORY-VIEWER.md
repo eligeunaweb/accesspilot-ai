@@ -18,9 +18,10 @@ página actual; «Comparar con la última» funciona desde cualquier página.
 Las fechas son UTC, con UUID abreviados; los enlaces conservan el ID completo.
 
 La vista muestra hasta 50 incidencias por grupo y 512 caracteres por selector, con
-aviso; la descarga JSON conserva toda la evidencia almacenada. El historial no
-contiene gravedad, recomendaciones ni comprobaciones manuales: use los informes
-originales de la CLI para esos datos. La comparación utiliza las reglas existentes
+aviso; la descarga JSON conserva toda la evidencia almacenada. Los registros nuevos
+conservan gravedad, recomendaciones y comprobaciones pendientes; los antiguos
+indican los datos ausentes. Se ofrecen también HTML independiente y CSV.
+Véase [RICH-HISTORY.md](RICH-HISTORY.md). La comparación utiliza las reglas existentes
 de cobertura, motor y política. Una ausencia de incidencias no certifica WCAG.
 
 ### Seguridad y límites
@@ -54,8 +55,9 @@ con lectores de pantalla y usuarios sigue pendiente.
 
 El panel de varios proyectos y los filtros por fecha/identificador están disponibles
 mediante `--workspace`; véase [WORKSPACES.md](WORKSPACES.md).
-Pendientes: búsqueda/filtros por contenido/estado/gravedad, tendencias,
-historial enriquecido con informes completos y ejecución segura desde la web.
+Los filtros por contenido/estado/gravedad y las tendencias acotadas ya están
+disponibles. Pendientes: analítica avanzada, comprobaciones humanas guiadas y
+ejecución segura desde la web.
 
 ## English
 
@@ -69,8 +71,9 @@ Lists show 50 runs per page; the form selects within that page, while row links
 compare any older run to the newest run in the entire history. Dates are UTC and
 UUIDs abbreviated; links retain full IDs. Display is limited to 50 findings per
 group and 512 characters per selector with a notice; JSON preserves all stored
-evidence. History lacks severity, recommendations and manual checks: use original
-CLI reports for those fields. Automated results do not certify WCAG conformance.
+evidence. New records retain severity, recommendations and incomplete review
+evidence; legacy records expose missing data. Offline HTML/CSV and rich detail
+filters/trends are available; see RICH-HISTORY.md. Automated results do not certify WCAG conformance.
 
 The server binds only to `127.0.0.1`, generates a fresh 256-bit session path and
 checks exact Host, supplied Origin and cross-site/same-site Fetch Metadata.
@@ -92,5 +95,5 @@ HTTP and real Chromium/axe tests cover access controls, pagination, export, erro
 shutdown, ES/EN, keyboard/form interactions, details, escaped malicious content
 and a 375 px viewport. The multi-project dashboard and date/ID filters are now
 available through `--workspace`; see WORKSPACES.md. Manual screen-reader/user
-testing, content/status/severity filters, trends, enriched history and safely isolated
+testing, advanced analytics, guided human checks and safely isolated
 web audit execution remain pending.

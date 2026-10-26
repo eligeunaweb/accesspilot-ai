@@ -199,3 +199,37 @@ and the 175-test local result are unchanged.
   multiuser authorization. Counts represent recognized filenames, not validated
   compliance results. See WORKSPACES.md for configuration and security boundaries.
 
+# Enriched history/import/analytics/exports — 2026-10-26
+
+- Full local suite: **188 passed, 0 failed, 0 skipped**, 25.96 seconds,
+  Windows / Node 24.11.1. Exact source has no dependency additions.
+- Command and host limits remain: `node --import ./tests/helpers/outer-sandbox.js --test`,
+  ACCESSPILOT_TEST_OUTER_SANDBOX=1, installed workspace browser cache, writable
+  TEMP/TMP and local network permission. Production never reads the test-only
+  adapter flag; native sandbox and current matrix require their own evidence.
+- Verified enriched round trips, preserved timestamps/tool/severity/WCAG/guidance/
+  pending review, idempotent validation, additive legacy conversion without source
+  modification, unknown fields/counts, future-version rejection, no node HTML or
+  diagnostic retention, and strict import project identity/type checks.
+- Metrics/trends tests cover failed pages, unknown review, incompatible engines,
+  partial coverage, out-of-order original timestamps, corruption gaps, ten-record
+  windows and a 40 MiB analytical input budget. No compliance score is generated.
+- Real HTTP/CLI/Chromium/axe cover import/export, ES/EN evidence forms, severity/
+  review/WCAG filtering, mobile layouts, trend tables, whole-record downloads,
+  standalone HTML without session credentials and accessibility checks. CSV
+  formula defenses and 5 MiB input/40 MiB output export caps were exercised.
+- Found and fixed during testing: a new navigation landmark needed a distinct
+  accessible name. Existing layout/keyboard/security regression tests stayed enabled.
+- Reproducible synthetic benchmark, current source: 30 runs × 5 pages × 10 rules ×
+  20 nodes; loaded ten records / 365940 input bytes. Save 186 ms, read+compare 67 ms;
+  Node RSS before 51400704 bytes / after 83345408 bytes. One small local sample,
+  no Chromium, real website throughput, large-history SLA or competitor claim.
+- Previous CI head 9dcb9eb had three successful jobs and three cancelled during
+  dependency installation after roughly 2–3 minutes. Those logs did not show test
+  failures or establish a cancellation cause. A new source-head matrix is required;
+  no six-job success is claimed based on partial or cancelled runs.
+- Pending: independent security/OS egress review, native current-head matrix,
+  manual screen-reader/user testing, configurable sensitive-data redaction,
+  authenticated/responsive journeys, scheduler/API jobs and release/install gates.
+  See RICH-HISTORY.md for persisted fields, migration and export limitations.
+

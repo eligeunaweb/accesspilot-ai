@@ -208,6 +208,10 @@ See [viewer guide / guía del visor](docs/HISTORY-VIEWER.md).
 Use `--workspace examples/workspace.json --history .accesspilot-history --serve-history`
 for the multi-project dashboard. Search by project name/URL, then filter each
 history by UTC dates or run ID. See [workspaces / espacios de trabajo](docs/WORKSPACES.md).
+New history records retain severity, WCAG, guidance and incomplete review evidence.
+Use run-detail filters, bounded trends and JSON/HTML/CSV downloads in the viewer.
+Import compatible project JSON with `--import-history audit.json` alongside
+`--project` and `--history`. See [rich history / historial enriquecido](docs/RICH-HISTORY.md).
 Preview count-based retention with `--prune-history --keep-runs 30`; add
 `--apply-retention` to apply it. Maintenance never launches the browser.
 See [history documentation / documentación del historial](docs/HISTORY.md) for

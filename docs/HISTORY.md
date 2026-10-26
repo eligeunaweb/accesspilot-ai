@@ -25,9 +25,10 @@ comparador marca las páginas o políticas incompatibles. Los nombres no se usan
 como rutas. Cada registro tiene fecha UTC y UUID; empates de milisegundos se ordenan
 por UUID, no por orden de finalización. El reloj local debe ser correcto.
 
-Se conserva solo el esquema de comparación versión 1: configuración, URLs,
-estados, motor, versión de política y reglas/selectores. Se omiten HTML, mensajes
-de error, recomendaciones y resultados completos de comprobaciones manuales.
+Los registros nuevos usan `historyVersion: 2` y conservan también gravedad, WCAG,
+recomendaciones y evidencia pendiente de revisión, cuando existe. El esquema de
+auditoría sigue en versión 1. Los registros antiguos se leen sin inventar datos.
+Se omiten HTML de nodos y mensajes diagnósticos/error. Véase [RICH-HISTORY.md](RICH-HISTORY.md).
 **URLs (incluidas consultas y fragmentos), nombres y selectores pueden contener
 datos sensibles.** Esta minimización no garantiza anonimización. Elija un
 directorio privado y no guarde tokens en URLs ni identificadores del DOM.
@@ -64,7 +65,8 @@ No se rompen bloqueos automáticamente. Los clientes de versiones antiguas no
 participan en este protocolo: no los ejecute contra el mismo historial a la vez.
 Los temporales abandonados se pueden borrar con la aplicación detenida.
 La retención no se ejecuta al guardar; programación automática, retención por edad
-o espacio, importación y migraciones de futuros esquemas siguen pendientes.
+o espacio y migraciones de futuros esquemas siguen pendientes. La importación y
+conversión aditiva ya están disponibles con `--import-history`.
 El visor web local de solo lectura está documentado en HISTORY-VIEWER.md.
 
 ## English
@@ -78,8 +80,10 @@ renaming starts a different history. Scope and policy changes are evaluated by
 the existing coverage-aware comparator. Complete reports remain available via
 `--output`.
 
-Only version-1 comparison evidence is stored, excluding HTML, error messages and
-arbitrary report fields. **URLs including queries/fragments, project names and
+New records carry `historyVersion: 2` with severity, WCAG, guidance and incomplete
+review evidence; legacy records remain readable with unknown fields. Node HTML,
+diagnostic/error messages and arbitrary report fields are excluded. See RICH-HISTORY.md.
+**URLs including queries/fragments, project names and
 selectors can still contain sensitive information.** This is data minimization,
 not anonymization. Choose a private, trusted local directory. There is no
 encryption or synchronization. Windows uses inherited ACLs; POSIX creation modes
@@ -110,5 +114,6 @@ not honor this protocol and must not share the store concurrently. Remove abando
 temporary files only while the app is stopped.
 
 Retention does not run automatically on save. Scheduled/age/size-based retention,
-import and future-schema migration remain roadmap work. The read-only local web
+future-schema migration remain roadmap work. Additive import/conversion is available
+through `--import-history`. The read-only local web
 viewer is documented in HISTORY-VIEWER.md.

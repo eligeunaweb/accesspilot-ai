@@ -46,8 +46,9 @@ espacio; no existe control multiusuario por proyecto. El panel sigue usando
 bloqueos y puede crear carpetas vacías para proyectos sin historial. No modifica
 ni elimina registros. El equipo y la carpeta son de confianza.
 
-Pendientes: búsqueda dentro de reglas/selectores, filtros por estado o gravedad,
-gráficos de tendencias y métricas históricas enriquecidas, edición persistente de
+Los detalles de ejecución ya ofrecen búsqueda por regla/selector, filtros por
+estado/gravedad y tendencias acotadas; véase RICH-HISTORY.md.
+Pendientes: índices de todo el archivo histórico, gráficos avanzados, edición persistente de
 proyectos y ejecución de trabajos con aislamiento. No se presentan estas funciones
 como terminadas. La revisión manual con lectores de pantalla sigue pendiente.
 
@@ -84,6 +85,7 @@ is not per-user/per-project access control. Local files and the computer are
 trusted. Read locks and empty project directories may be created; run records
 are not modified/deleted by the viewer.
 
-Content/status/severity filters, trends, richer historical metrics, persistent
+Selected-run content/status/severity filters and bounded trends are available;
+see RICH-HISTORY.md. Whole-archive indexes, advanced charts, persistent
 project editing and isolated audit-job execution remain roadmap work. Manual
 screen-reader/user validation is still pending.
