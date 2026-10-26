@@ -1,4 +1,4 @@
-# AccessPilot AI 🧭
+# AccessPilot AI ðŸ§­
 
 Free, open-source **automated accessibility review CLI** built with Playwright and axe-core.
 
@@ -6,14 +6,14 @@ Free, open-source **automated accessibility review CLI** built with Playwright a
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22.12+
 - Internet access for the initial npm/browser installation (and to visit public sites)
 - Permission to audit the target website
 
 ## Windows PowerShell quick start
 
 ```powershell
-npm install
+npm ci
 npx playwright install chromium
 npm link
 accesspilot https://example.com --format html --output report.html
@@ -36,9 +36,9 @@ accesspilot <http(s) URL> [--format text|json|html] [--output filename] [--fail-
 
 Use `--fail-on-violations` in CI to return exit code 1 if axe reports any violations. Network/browser errors return 2. Reports include potentially sensitive page content and selectors; review them before sharing.
 
-## Español
+## EspaÃ±ol
 
-AccessPilot AI v0.1.0 analiza automáticamente páginas web mediante Playwright y axe-core y genera informes de texto, JSON o HTML. **No garantiza el cumplimiento de WCAG**: hay que complementar el análisis con pruebas manuales de teclado, lectores de pantalla y experiencia de uso. No introduce cambios en la web auditada.
+AccessPilot AI v0.1.0 analiza automÃ¡ticamente pÃ¡ginas web mediante Playwright y axe-core y genera informes de texto, JSON o HTML. **No garantiza el cumplimiento de WCAG**: hay que complementar el anÃ¡lisis con pruebas manuales de teclado, lectores de pantalla y experiencia de uso. No introduce cambios en la web auditada.
 
 ## Limitations
 
@@ -51,3 +51,19 @@ AccessPilot AI v0.1.0 analiza automáticamente páginas web mediante Playwright 
 ## License
 
 MIT.
+
+## Development / Desarrollo
+
+See [audit and roadmap / auditoría y hoja de ruta](docs/AUDIT-ROADMAP.md).
+Use Node.js 22.12 or newer. / Usa Node.js 22.12 o superior.
+
+```powershell
+npm ci
+npx playwright install chromium
+npm test
+```
+
+Tests include a real Chromium audit of a local HTTP fixture; no public target is required.
+Las pruebas incluyen una auditoría real con Chromium de un servidor local.
+HTTP errors return exit code 2. / Los errores HTTP devuelven código 2.
+`--output` overwrites the selected file. / `--output` sobrescribe el archivo indicado.

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { chromium } from 'playwright';
-import AxeBuilder from '@axe-core/playwright';
+import { auditPage } from './audit.js';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { htmlReport, summarize } from './report.js';
+import { htmlReport } from './report.js';
 import { parse } from './args.js';
 
 function usage() {
@@ -12,15 +13,8 @@ export async function main(args=process.argv.slice(2)) {
   let opts;
   try {opts=parse(args);} catch(err) {console.error(err.message);usage();return 2;}
   if(opts.help) {usage();return 0;}
-  let browser;
-  let context;
   try {
-    browser=await chromium.launch({headless:true});
-    context=await browser.newContext();
-    const page=await context.newPage();
-    await page.goto(opts.url,{waitUntil:'domcontentloaded',timeout:30000});
-    const results=await new AxeBuilder({page}).analyze();
-    const report=summarize(results,page.url());
+    const report=await auditPage(opts.url);
     const output=opts.format==='json'?JSON.stringify(report,null,2):opts.format==='html'?htmlReport(report):[
       `AccessPilot AI v0.1.0 | ${report.url}`,
       `${report.violations.length} violated rules; ${report.incomplete} checks need review`,
@@ -31,9 +25,8 @@ export async function main(args=process.argv.slice(2)) {
     else console.log(output);
     return opts.fail && report.violations.length>0?1:0;
   } catch(err) {console.error(`Audit failed: ${err.message}`);return 2;}
-  finally {if(context) await context.close();
-    if(browser) await browser.close();}
+
 }
-if(process.argv[1] && import.meta.url===new URL(`file://${process.argv[1].replace(/\\/g,'/')}`).href) {
+if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   process.exitCode=await main();
 }
