@@ -37,6 +37,8 @@ export function validateSnapshot(input) {
     if (!report || report.schemaVersion !== 1 || report.kind !== 'page-audit') throw new Error('Invalid snapshot page report');
     const actual=report.viewport==null?undefined:validateViewport(report.viewport);
     if(!sameViewport(actual,viewport)) throw new Error('Snapshot report viewport mismatch');
+    if(JSON.stringify(report.authentication??null)!==JSON.stringify(project.authentication??null)) throw new Error('Snapshot authentication evidence mismatch');
+    const authentication=project.authentication?{authentication:{...project.authentication}}:{};
     const finalUrl=normalizeUrl(report.url);
     let engine=null;
     if (report.engine) engine={name:text(report.engine.name,128,'engine name'),version:text(report.engine.version,128,'engine version')};
@@ -51,7 +53,7 @@ export function validateSnapshot(input) {
       if(!Number.isInteger(report.network.policyVersion)||report.network.policyVersion<1) throw new Error('Invalid snapshot network policy version');
       network={policyVersion:report.network.policyVersion};
     }
-    return {url,status:'succeeded',...profile,...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,...profile,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
+    return {url,status:'succeeded',...profile,...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,...profile,...authentication,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
   });
   for(const seed of project.urls) for(const viewport of profiles) if(!seen.has(pageKey({url:seed,viewport}))) throw new Error('Snapshot omits a configured seed/profile');
   let generatedAt=null;
@@ -99,7 +101,7 @@ function findings(page) {
 }
 export function compareAudits(beforeInput, afterInput) {
   const before=validateSnapshot(beforeInput), after=validateSnapshot(afterInput);
-  const fingerprint=project=>JSON.stringify([project.crawl ?? null,project.network ?? null,project.network ? [...new Set(project.urls.map(url=>new URL(url).origin))].sort() : null]);
+  const fingerprint=project=>JSON.stringify([project.authentication??null,project.crawl ?? null,project.network ?? null,project.network ? [...new Set(project.urls.map(url=>new URL(url).origin))].sort() : null]);
   const oldPages=new Map(before.pages.map(page=>[pageKey(page),page]));
   const newPages=new Map(after.pages.map(page=>[pageKey(page),page]));
   const urls=[...new Set([...oldPages.keys(),...newPages.keys()])].sort();

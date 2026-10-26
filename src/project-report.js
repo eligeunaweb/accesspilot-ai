@@ -7,14 +7,14 @@ export function renderProject(run, format) {
   const lang=languageCode(run.project.language);const t=messages[lang];
   if (format === 'csv') {
     const profileColumns=!!run.project.viewports;
-    const rows=run.pages.flatMap(page=>(profileColumns ? [[page.status,page.url,'','','','',page.error??'','',''],...(page.report?findingRows(page.report):[])] : page.report ? findingRows(page.report) : [[page.status,page.url,'','','','',page.error,'','']])
+    const rows=run.pages.flatMap(page=>((profileColumns||run.project.authentication) ? [[page.status,page.url,'','','','',page.error??'','',''],...(page.report?findingRows(page.report):[])] : page.report ? findingRows(page.report) : [[page.status,page.url,'','','','',page.error,'','']])
       .map(row=>profileColumns?[...row,page.viewport.name,page.viewport.width,page.viewport.height]:row));
     if(run.crawl?.truncated) rows.push(['coverage-incomplete','','','','','',JSON.stringify(run.crawl),'','',...(profileColumns?['','','']:[])]);
-    return [profileColumns?[...csvHeaders,'viewport','viewport_width','viewport_height']:csvHeaders,...rows].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
+    return [profileColumns?[...csvHeaders,'viewport','viewport_width','viewport_height']:csvHeaders,...rows].map((row,index)=>run.project.authentication?[...row,index===0?'authentication_profile':run.project.authentication.profile]:row).map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
   }
   const coverage=run.crawl ? JSON.stringify(run.crawl) : '';
   const changes=run.comparison ? JSON.stringify(run.comparison.totals) : '';
-  const summary=`${run.project.name}: ${run.totals.succeeded} ${t.succeeded}; ${run.totals.failed} ${t.failed}; ${run.totals.cancelled} ${t.cancelled}; ${run.totals.violatedRules} ${t.rules.toLowerCase()}`;
+  const summary=`${run.project.name}${run.project.authentication?' ['+run.project.authentication.profile+']':''}: ${run.totals.succeeded} ${t.succeeded}; ${run.totals.failed} ${t.failed}; ${run.totals.cancelled} ${t.cancelled}; ${run.totals.violatedRules} ${t.rules.toLowerCase()}`;
   if (format === 'text') return [summary,...run.pages.map(page=>
     `${page.status.toUpperCase()} ${page.url}${page.viewport?' · '+viewportLabel(page.viewport):''}: ${page.report ? `${page.report.violations.length} ${t.rules.toLowerCase()}` : page.error}`),coverage,changes,t.disclaimer].filter(Boolean).join('\n');
   if (format !== 'html') throw new Error('Unsupported project report format');

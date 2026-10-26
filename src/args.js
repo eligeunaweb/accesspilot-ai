@@ -4,7 +4,7 @@ export function parse(args) {
   const opts = {format:'text', output:null, fail:false, url:null, project:null};
   for(let i=0;i<args.length;i++) {
     const arg=args[i];
-    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history') {
+    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history' || arg==='--session-state') {
       if(!args[i+1] || args[i+1].startsWith('--')) throw new Error(`Missing value for ${arg}`);
       opts[arg.slice(2)]=args[++i];
     } else if(arg==='--list-history') opts.listHistory=true;
@@ -41,6 +41,7 @@ export function parse(args) {
     if([opts.listHistory,opts.pruneHistory,opts.serveHistory,opts['import-history']].filter(Boolean).length>1) throw new Error('Choose one history operation');
     if(opts.baseline || opts.output || opts.fail || opts.format!=='text') throw new Error('History maintenance cannot be combined with audit output or baseline options');
   }
+  if(opts['session-state']&&(!opts.project||opts.listHistory||opts.pruneHistory||opts.serveHistory||opts['import-history'])) throw new Error('--session-state requires a project audit');
   if(opts.project || opts.workspace) return opts;
   let url;
   try {url=new URL(opts.url);} catch {throw new Error('Invalid URL');}

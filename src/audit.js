@@ -1,3 +1,5 @@
+import { validateSessionState, validateAuthentication } from './session.js';
+import { validateNetwork } from './network-policy.js';
 import { chromium } from 'playwright';
 import AxeBuilder from '@axe-core/playwright';
 import { summarize } from './report.js';
@@ -7,8 +9,13 @@ import { startEgressProxy } from './egress-proxy.js';
 import { validateViewport } from './viewport.js';
 
 export async function auditPage(url, { launch = options => chromium.launch(options),
-  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport } = {}) {
+  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport, authentication, sessionState } = {}) {
   url = normalizeUrl(url);
+  if(authentication!==undefined) {
+    network=validateNetwork(network);
+    authentication=validateAuthentication(authentication,scopeUrls,network);
+    sessionState=validateSessionState(sessionState,{authentication,urls:scopeUrls,network});
+  } else if(sessionState!==undefined) throw new Error('Session state requires authentication');
   if(viewport!==undefined) viewport=validateViewport(viewport);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) throw new Error('Invalid audit timeout');
   const controller = new AbortController();
@@ -35,7 +42,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     controller.signal.throwIfAborted();
     browser = await launch(launchOptions);
     controller.signal.throwIfAborted();
-    context = await browser.newContext({acceptDownloads:false, serviceWorkers:'block',...(viewport?{viewport:{width:viewport.width,height:viewport.height}}:{})});
+    context = await browser.newContext({acceptDownloads:false, serviceWorkers:'block',...(sessionState?{storageState:sessionState}:{}),...(viewport?{viewport:{width:viewport.width,height:viewport.height}}:{})});
     controller.signal.throwIfAborted();
     if(policy) {
       await context.route('**/*',async route=>{
@@ -80,11 +87,16 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
       }
       const response = await page.goto(url, {waitUntil:network?'load':'domcontentloaded', timeout:timeoutMs});
       if (!response || !response.ok()) throw new Error(`HTTP navigation failed: ${response?.status() ?? 'no response'}`);
+      if(authentication) {
+        try {await page.locator(authentication.readySelector).waitFor({state:'visible',timeout:Math.min(timeoutMs,5000)});}
+        catch {throw new Error('Authenticated access marker missing');}
+      }
       const result=await analyze(page);
       if(network) await page.waitForLoadState('networkidle',{timeout:timeoutMs});
       if(policy) policy.check(page.url(),true);
       const evidence=summarize(result,page.url(),{language});
       if(viewport) evidence.viewport=viewport;
+      if(authentication) evidence.authentication={...authentication};
       if(crawl) evidence.discovery=await page.evaluate(limit=>{
         const elements=document.querySelectorAll('a[href]');const links=[];
         for(let i=0;i<Math.min(elements.length,limit);i++) links.push(elements[i].href);
@@ -107,6 +119,6 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
       try { await resource.close(); } catch (error) { failure ??= error; }
     }
   }
-  if (failure) throw failure;
+  if (failure) throw authentication?new Error('Authenticated audit failed; session may be expired, access marker missing or network scope blocked'):failure;
   return report;
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { loadSessionState } from './session.js';
 import { auditPage } from './audit.js';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -19,6 +20,7 @@ function usage() {
   console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
   console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
   console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
+  console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
   console.log('Import evidence: --project config.json --history directory --import-history saved.json');
 }
 export async function main(args=process.argv.slice(2)) {
@@ -53,7 +55,8 @@ export async function main(args=process.argv.slice(2)) {
       if (opts.listHistory) { console.log(JSON.stringify(await listHistory(opts.history, project), null, 2)); return 0; }
       if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
-      const run = await auditProject(project, {signal:controller.signal});
+      const sessionState=opts['session-state']?await loadSessionState(opts['session-state'],project):undefined;
+      const run = await auditProject(project, {signal:controller.signal,sessionState});
       if (baseline) run.comparison = compareAudits(baseline, run);
       if (opts.history) { const id = await saveHistory(opts.history, run); console.error(`History saved: ${id}`); }
       const output = renderProject(run, opts.format);

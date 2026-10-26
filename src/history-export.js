@@ -21,8 +21,9 @@ export function exportHistory(input,format,language) {
       if(bytes>40*1024*1024) throw new Error('History CSV exceeds 40 MiB; use JSON');
       rows.push(line);
     };
-    const add=(row,viewport)=>emit([...row,viewport?.name??'',viewport?.width??'',viewport?.height??'']);
-    emit(['record_type','status','url','rule','severity','wcag','target','correction','verification','guidance_source','coverage_complete','review_rules','viewport','viewport_width','viewport_height']);
+    const auth=snapshot.project.authentication;
+    const add=(row,viewport)=>emit([...row,viewport?.name??'',viewport?.width??'',viewport?.height??'',...(auth?[auth.profile]:[])]);
+    emit(['record_type','status','url','rule','severity','wcag','target','correction','verification','guidance_source','coverage_complete','review_rules','viewport','viewport_width','viewport_height',...(auth?['authentication_profile']:[])]);
     add(['run','','','','','','','','','',metrics.complete??'unknown',metrics.review??'unknown']);
     for(const page of snapshot.pages) {
       add(['page',page.status,page.url,'','','','','','','','',''],page.viewport);
@@ -52,7 +53,7 @@ export function exportHistory(input,format,language) {
       <h3>${escapeHtml(t.findings)}</h3>${rulesHTML(report.violations)||`<p>${escapeHtml(t.none)}</p>`}
       <h3>${escapeHtml(t.review)} (${escapeHtml(report.incomplete??unknown)})</h3>${report.incompleteDetails==null?`<p>${unknown}</p>`:rulesHTML(report.incompleteDetails)}</section>`;
   }).join('');
-  const body=`<p>${escapeHtml(provenance)}</p><p>${escapeHtml(t.disclaimer)}</p><p>${escapeHtml(snapshot.generatedAt??unknown)}</p><p>${lang==='es'?'Páginas auditadas/fallidas/canceladas':'Audited/failed/cancelled pages'}: ${metrics.pages.succeeded}/${metrics.pages.failed}/${metrics.pages.cancelled}</p><p>${lang==='es'?'Cobertura completa del alcance configurado':'Complete configured scope'}: ${escapeHtml(metrics.complete??unknown)}</p>${pages}`;
+  const body=`${snapshot.project.authentication?`<p>${lang==='es'?'Perfil de acceso':'Access profile'}: ${escapeHtml(snapshot.project.authentication.profile)}</p>`:''}<p>${escapeHtml(provenance)}</p><p>${escapeHtml(t.disclaimer)}</p><p>${escapeHtml(snapshot.generatedAt??unknown)}</p><p>${lang==='es'?'Páginas auditadas/fallidas/canceladas':'Audited/failed/cancelled pages'}: ${metrics.pages.succeeded}/${metrics.pages.failed}/${metrics.pages.cancelled}</p><p>${lang==='es'?'Cobertura completa del alcance configurado':'Complete configured scope'}: ${escapeHtml(metrics.complete??unknown)}</p>${pages}`;
   const html=htmlDocument(snapshot.project.name,lang,body);
   if(Buffer.byteLength(html)>40*1024*1024) throw new Error('History HTML exceeds 40 MiB; use JSON');
   return html;

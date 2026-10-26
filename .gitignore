@@ -10,3 +10,6 @@ pagina-prueba.html
 *.log
 .env
 .accesspilot-history/
+
+.accesspilot-auth/
+playwright/.auth/

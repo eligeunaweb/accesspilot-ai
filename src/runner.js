@@ -1,3 +1,4 @@
+import { validateSessionState } from './session.js';
 import { performance } from 'node:perf_hooks';
 import { auditPage } from './audit.js';
 import { validateProject } from './project.js';
@@ -15,11 +16,12 @@ async function auditTargets(targets, project, audit, signal) {
         const report=await audit(url,{signal,timeoutMs:project.timeoutMs,language:project.language,
           network:project.network,scopeUrls:project.urls,crawl:project.crawl,viewport:target.viewport});
         if(target.viewport&&!sameViewport(validateViewport(report.viewport),target.viewport)) throw new Error('Audit viewport evidence does not match the requested profile');
+        if(project.authentication&&JSON.stringify(report.authentication)!==JSON.stringify(project.authentication)) throw new Error('Authentication evidence does not match the requested profile');
         if(signal?.aborted) throw new Error('Audit cancelled');
         pages[index]={...target,status:'succeeded',durationMs:Math.round(performance.now()-started),report};
       } catch(error) {
         pages[index]={...target,status:signal?.aborted?'cancelled':'failed',durationMs:Math.round(performance.now()-started),
-          error:error instanceof Error?error.message:'Audit failed'};
+          error:project.authentication?'Authenticated audit failed; session may be expired or access marker missing':error instanceof Error?error.message:'Audit failed'};
       }
     }
   }
@@ -87,8 +89,12 @@ async function crawlProject(project,audit,signal,generatedAt,started,viewport,de
   return finish(project,pages,generatedAt,started,{crawl:{discoveredPages:seen.size,skipped,linkLimitReached,
     termination,truncated,completeWithinScope:!truncated&&pages.every(page=>page.status==='succeeded')}});
 }
-export async function auditProject(input,{audit=auditPage,signal}={}) {
+export async function auditProject(input,{audit=auditPage,signal,sessionState}={}) {
   const project=validateProject(input),started=performance.now(),generatedAt=new Date().toISOString();
+  if(project.authentication) {
+    const state=validateSessionState(sessionState,project),delegate=audit;
+    audit=(url,options)=>delegate(url,{...options,authentication:project.authentication,sessionState:structuredClone(state)});
+  } else if(sessionState!==undefined) throw new Error('Session state requires project authentication');
   if(project.crawl) {
     if(!project.viewports) return crawlProject(project,audit,signal,generatedAt,started);
     const pages=[],profiles=[];let deadlineExpired=false;

@@ -43,7 +43,7 @@ export function richRunView(snapshot,filters,lang,base,run) {
   const cards=[...Object.entries(metrics.pages),['rules',metrics.rules],['elements',metrics.elements],['reviewRules',metrics.review??t.unknown],...Object.entries(metrics.severity)];
   const summary=`<h2>${t.summary}</h2><p>${t.note} ${metrics.complete===true?t.complete:t.partial}</p>${legacy?`<p class="notice">${t.legacy}</p>`:''}
     <div class="grid">${cards.map(([key,n])=>`<div class="metric"><strong>${escape(n)}</strong>${t[key]}</div>`).join('')}</div>`;
-  const body=pages.map(page=>`<details><summary>${escape(page.url)} ${escape(viewportLabel(page.viewport))} · ${t[page.status]}</summary>
+  const body=pages.map(page=>`<details><summary>${escape(page.url)} ${escape(viewportLabel(page.viewport))}${snapshot.project.authentication?' · '+escape(snapshot.project.authentication.profile):''} · ${t[page.status]}</summary>
     ${page.status!=='succeeded'?`<p>${t.noAudit}</p>`:`<p>${escape(page.report.engine?`${page.report.engine.name} ${page.report.engine.version}`:t.unknown)}</p>
       <h3>${t.violations}</h3>${rulesView(page.report.violations,t,lang)}
       <h3>${t.review}</h3>${page.report.incompleteDetails==null?`<p>${t.unknownReview}</p>`:rulesView(page.report.incompleteDetails,t,lang)}`}</details>`).join('');
