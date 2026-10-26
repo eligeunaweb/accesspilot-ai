@@ -8,7 +8,6 @@ export function normalizeUrl(value) {
   try { url = new URL(value); } catch { throw new Error('Invalid URL'); }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only http(s) URLs are supported');
   if (url.username || url.password) throw new Error('URLs with credentials are not supported');
-  url.hash = '';
   return url.toString();
 }
 function integer(value, fallback, min, max, key) {

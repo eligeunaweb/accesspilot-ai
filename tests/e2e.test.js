@@ -29,7 +29,8 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
   t.after(async()=>{await new Promise(resolve=>server.close(resolve));await rm(dir,{recursive:true,force:true});});
   const url=`http://127.0.0.1:${server.address().port}`;
   await t.test('axe detects real missing alternative text and button names',async()=>{
-    const r=await auditPage(url);
+    const r=await auditPage(url+'/#route');
+    assert.ok(r.url.endsWith('/#route'));
     assert.ok(r.violations.some(v=>v.id==='image-alt'));
     assert.ok(r.violations.some(v=>v.id==='button-name'));
   });

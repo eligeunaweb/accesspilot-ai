@@ -13,10 +13,10 @@ for (const [label, change] of Object.entries({
   largeTimeout:{timeoutMs:120001}, nullTimeout:{timeoutMs:null}, badName:{name:'\u001b[31m'}, emptyName:{name:' '}
 })) test(`project rejects ${label}`,()=>assert.throws(()=>validateProject({...base,...change})));
 test('normalizes URLs and applies limits without mutating input',()=>{
-  const input={...base, urls:['https://EXAMPLE.org:443/#one','https://example.org/#two','https://other.org']};
+  const input={...base, urls:['https://EXAMPLE.org:443/#one','https://example.org/#one','https://example.org/#two','https://other.org']};
   const result=validateProject(input);
-  assert.deepEqual(result.urls,['https://example.org/','https://other.org/']);
-  assert.equal(result.concurrency,1); assert.equal(result.timeoutMs,30000);assert.equal(input.urls.length,3);
+  assert.deepEqual(result.urls,['https://example.org/#one','https://example.org/#two','https://other.org/']);
+  assert.equal(result.concurrency,1); assert.equal(result.timeoutMs,30000);assert.equal(input.urls.length,4);
 });
 test('project CLI disallows ambiguous targets',()=>{
   assert.throws(()=>parse(['https://example.org','--project','a.json']),/not both/);

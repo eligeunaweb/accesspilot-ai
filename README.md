@@ -77,7 +77,7 @@ node .\src\cli.js --project .\examples\project.json --format json --output portf
 Project JSON uses `schemaVersion: 1`, `name`, `urls` (1–100 HTTP(S) URLs), optional
 `concurrency` (1–4; default 1) and `timeoutMs` (1000–120000; default 30000).
 Unknown properties and credential-bearing URLs are rejected. URLs are normalized;
-fragments are removed and duplicates run once. JSON configuration is limited to 1 MiB.
+fragments are preserved for hash-routed applications and exact duplicates run once. JSON configuration is limited to 1 MiB.
 Each URL has a fresh browser/context. No crawling or implicit config discovery.
 A failed target does not hide successful targets. Failed/cancelled runs exit 2;
 `--fail-on-violations` exits 1 only when every target succeeded. Ctrl+C cancels
