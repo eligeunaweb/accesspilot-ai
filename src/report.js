@@ -1,4 +1,5 @@
 import { messages, languageCode, recommendation } from './i18n.js';
+import { viewportLabel } from './viewport.js';
 
 export function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -40,6 +41,12 @@ export function findingRows(report) {
       JSON.stringify(node.target),node.failureSummary,rule.recommendation?.correction,rule.recommendation?.verification])));
 }
 export function csvReport(report) {
+  if(report.viewport) {
+    const columns=[report.viewport.name,report.viewport.width,report.viewport.height];
+    return [[...csvHeaders,'viewport','viewport_width','viewport_height'],...[
+      ['succeeded',report.url,'','','','','','',''],...findingRows(report)
+    ].map(row=>[...row,...columns])].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  }
   return [csvHeaders,...findingRows(report)].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
 }
 export const reportStyle = `body{font:1rem/1.6 system-ui,sans-serif;max-width:76rem;margin:auto;padding:1.5rem;color:#202124;background:#fff}table{border-collapse:collapse;width:100%}th,td{border:1px solid #777;padding:.6rem;text-align:left;vertical-align:top}th{background:#eee}code,td,p,h2,summary{overflow-wrap:anywhere}summary{cursor:pointer;padding:.7rem;font-weight:600}details{border:1px solid #777;margin:1rem 0;padding:.6rem}a:focus-visible,summary:focus-visible{outline:3px solid #1769aa;outline-offset:3px}nav ul{display:flex;flex-wrap:wrap;gap:1.5rem;padding-left:1.5rem}.scroll{overflow-x:auto}.metrics{padding:1rem;background:#f1f5f9}pre{white-space:pre-wrap}h2{margin-top:2rem}`;
@@ -63,7 +70,7 @@ export function pageReportBody(report, prefix = 'page') {
   }).join('');
   const nav=groups.filter(impact=>report.violations.some(rule=>(groups.includes(rule.impact)?rule.impact:'unknown')===impact))
     .map(impact=>`<li><a href="#${prefix}-${impact}">${impact === 'unknown' ? t.other : t[impact]}</a></li>`).join('');
-  return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p><p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${escapeHtml(report.passes)}; ${t.review}: ${escapeHtml(report.incomplete)}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${escapeHtml(report.incomplete)})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
+  return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p>${report.viewport?`<p>Viewport: ${escapeHtml(viewportLabel(report.viewport))}</p>`:''}<p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${escapeHtml(report.passes)}; ${t.review}: ${escapeHtml(report.incomplete)}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${escapeHtml(report.incomplete)})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
 }
 export function htmlDocument(title, language, body) {
   const lang=languageCode(language);

@@ -1,6 +1,7 @@
 import { open } from 'node:fs/promises';
 import { normalizeUrl, validateProject } from './project.js';
 import { ruleDetails, reviewDetails } from './snapshot-detail.js';
+import { pageKey, sameViewport, validateViewport } from './viewport.js';
 
 const MAX_SNAPSHOT_BYTES = 20 * 1024 * 1024;
 function text(value, limit, label) {
@@ -17,18 +18,25 @@ export function validateSnapshot(input) {
   if(input.historyVersion!==undefined&&![1,2].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
   const rich=input.historyVersion===2;
   const project=validateProject(input.project);
-  if (!Array.isArray(input.pages) || (project.crawl ? input.pages.length<project.urls.length||input.pages.length>project.crawl.maxPages : input.pages.length!==project.urls.length)) throw new Error('Invalid snapshot page count');
+  const profiles=project.viewports??[null],count=profiles.length;
+  if (!Array.isArray(input.pages) || (project.crawl ? input.pages.length<project.urls.length*count||input.pages.length>project.crawl.maxPages*count : input.pages.length!==project.urls.length*count)) throw new Error('Invalid snapshot page count');
   const seen=new Set();
   const pages=input.pages.map(page=>{
     const url=normalizeUrl(page.url);
+    const requested=page.viewport==null?undefined:validateViewport(page.viewport);
+    const viewport=project.viewports?.find(profile=>sameViewport(profile,requested));
+    if(project.viewports&&!viewport || !project.viewports&&page.viewport!=null) throw new Error('Invalid snapshot viewport');
+    const identity=pageKey({url,viewport}),profile=viewport?{viewport}:{};
     const inScope=project.crawl ? project.urls.some(seed=>new URL(seed).origin===new URL(url).origin) : project.urls.includes(url);
     if(project.crawl&&(!Number.isInteger(page.depth)||page.depth<0||page.depth>project.crawl.maxDepth)) throw new Error('Invalid snapshot crawl depth');
-    if (seen.has(url) || !inScope) throw new Error('Invalid snapshot page scope');
-    seen.add(url);
+    if (seen.has(identity) || !inScope) throw new Error('Invalid snapshot page scope');
+    seen.add(identity);
     if (!['succeeded','failed','cancelled'].includes(page.status)) throw new Error('Invalid snapshot page status');
-    if (page.status !== 'succeeded') return {url,status:page.status,...(project.crawl?{depth:page.depth}:{})};
+    if (page.status !== 'succeeded') return {url,status:page.status,...profile,...(project.crawl?{depth:page.depth}:{})};
     const report=page.report;
     if (!report || report.schemaVersion !== 1 || report.kind !== 'page-audit') throw new Error('Invalid snapshot page report');
+    const actual=report.viewport==null?undefined:validateViewport(report.viewport);
+    if(!sameViewport(actual,viewport)) throw new Error('Snapshot report viewport mismatch');
     const finalUrl=normalizeUrl(report.url);
     let engine=null;
     if (report.engine) engine={name:text(report.engine.name,128,'engine name'),version:text(report.engine.version,128,'engine version')};
@@ -43,9 +51,9 @@ export function validateSnapshot(input) {
       if(!Number.isInteger(report.network.policyVersion)||report.network.policyVersion<1) throw new Error('Invalid snapshot network policy version');
       network={policyVersion:report.network.policyVersion};
     }
-    return {url,status:'succeeded',...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
+    return {url,status:'succeeded',...profile,...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,...profile,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
   });
-  for(const seed of project.urls) if(!seen.has(seed)) throw new Error('Snapshot omits a configured seed');
+  for(const seed of project.urls) for(const viewport of profiles) if(!seen.has(pageKey({url:seed,viewport}))) throw new Error('Snapshot omits a configured seed/profile');
   let generatedAt=null;
   if(rich&&input.generatedAt!==undefined&&input.generatedAt!==null) {
     if(typeof input.generatedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(input.generatedAt)||Number.isNaN(Date.parse(input.generatedAt))||new Date(input.generatedAt).toISOString()!==input.generatedAt) throw new Error('Invalid history timestamp');
@@ -92,28 +100,30 @@ function findings(page) {
 export function compareAudits(beforeInput, afterInput) {
   const before=validateSnapshot(beforeInput), after=validateSnapshot(afterInput);
   const fingerprint=project=>JSON.stringify([project.crawl ?? null,project.network ?? null,project.network ? [...new Set(project.urls.map(url=>new URL(url).origin))].sort() : null]);
-  const oldPages=new Map(before.pages.map(page=>[page.url,page]));
-  const newPages=new Map(after.pages.map(page=>[page.url,page]));
+  const oldPages=new Map(before.pages.map(page=>[pageKey(page),page]));
+  const newPages=new Map(after.pages.map(page=>[pageKey(page),page]));
   const urls=[...new Set([...oldPages.keys(),...newPages.keys()])].sort();
   const totals={comparablePages:0,incomparablePages:0,added:0,resolved:0,persistent:0};
-  const pages=urls.map(url=>{
-    const oldPage=oldPages.get(url),newPage=newPages.get(url);
+  const pages=urls.map(identity=>{
+    const oldPage=oldPages.get(identity),newPage=newPages.get(identity);
+    const selected=newPage??oldPage,url=selected.url,profile=selected.viewport?{viewport:selected.viewport}:{};
     let reason;
     if(fingerprint(before.project)!==fingerprint(after.project)) reason='policy-changed';
     else if (!oldPage || !newPage) reason='scope-changed';
+    else if(!sameViewport(oldPage.viewport,newPage.viewport)) reason='viewport-changed';
     else if (oldPage.status !== 'succeeded' || newPage.status !== 'succeeded') reason='page-not-audited';
     else if (oldPage.report.url !== newPage.report.url) reason='destination-changed';
     else if(before.project.network&&(!oldPage.report.network||!newPage.report.network)) reason='network-policy-unknown';
     else if(before.project.network&&oldPage.report.network.policyVersion!==newPage.report.network.policyVersion) reason='network-policy-changed';
     else if (!oldPage.report.engine || !newPage.report.engine) reason='engine-unknown';
     else if (JSON.stringify(oldPage.report.engine) !== JSON.stringify(newPage.report.engine)) reason='engine-changed';
-    if (reason) {totals.incomparablePages++;return {url,status:'incomparable',reason};}
+    if (reason) {totals.incomparablePages++;return {url,...profile,status:'incomparable',reason};}
     const oldFindings=findings(oldPage),newFindings=findings(newPage);
     const added=[...newFindings].filter(([key])=>!oldFindings.has(key)).map(([,value])=>value);
     const resolved=[...oldFindings].filter(([key])=>!newFindings.has(key)).map(([,value])=>value);
     const persistent=[...newFindings].filter(([key])=>oldFindings.has(key)).map(([,value])=>value);
     totals.comparablePages++;totals.added+=added.length;totals.resolved+=resolved.length;totals.persistent+=persistent.length;
-    return {url,status:'comparable',added,resolved,persistent};
+    return {url,...profile,status:'comparable',added,resolved,persistent};
   });
   return {schemaVersion:1,kind:'audit-comparison',totals,pages,
     note:'Resolution means an automated finding was not observed at the same selector. DOM/selector changes can change identity. Human review and incomplete checks are not resolved by this comparison.'};

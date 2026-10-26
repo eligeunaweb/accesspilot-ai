@@ -8,10 +8,10 @@ export function evidenceFilters(params) {
 export function selectEvidence(snapshot,filters) {
   const search=filters.text.toLowerCase();
   const pages=snapshot.pages.filter(page=>filters.status==='all'||page.status===filters.status).map(page=>{
-    if(page.status!=='succeeded') return !search||page.url.toLowerCase().includes(search)?page:null;
+    if(page.status!=='succeeded') return !search||`${page.url} ${page.viewport?.name??''}`.toLowerCase().includes(search)?page:null;
     const select=rules=>(rules??[]).flatMap(rule=>{
       if(filters.severity!=='all'&&(rule.impact??'unknown')!==filters.severity) return [];
-      const common=[page.url,rule.id,rule.help??'',...(rule.wcag??[])].join(' ').toLowerCase();
+      const common=[page.url,page.viewport?.name??'',rule.id,rule.help??'',...(rule.wcag??[])].join(' ').toLowerCase();
       const nodes=rule.nodes.filter(node=>!search||common.includes(search)||JSON.stringify(node.target).toLowerCase().includes(search));
       return nodes.length?[{...rule,nodes}]:[];
     });

@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { auditPage } from './audit.js';
 import { validateProject } from './project.js';
 import { normalizeUrl } from './url.js';
+import { sameViewport, validateViewport } from './viewport.js';
 
 async function auditTargets(targets, project, audit, signal) {
   const pages=new Array(targets.length);let cursor=0;
@@ -12,7 +13,8 @@ async function auditTargets(targets, project, audit, signal) {
       const started=performance.now();
       try {
         const report=await audit(url,{signal,timeoutMs:project.timeoutMs,language:project.language,
-          network:project.network,scopeUrls:project.urls,crawl:project.crawl});
+          network:project.network,scopeUrls:project.urls,crawl:project.crawl,viewport:target.viewport});
+        if(target.viewport&&!sameViewport(validateViewport(report.viewport),target.viewport)) throw new Error('Audit viewport evidence does not match the requested profile');
         if(signal?.aborted) throw new Error('Audit cancelled');
         pages[index]={...target,status:'succeeded',durationMs:Math.round(performance.now()-started),report};
       } catch(error) {
@@ -38,15 +40,17 @@ function isExcluded(url,paths) {
   try {path=decodeURIComponent(path);} catch { /* Keep the literal path. */ }
   return paths.some(prefix=>path.toLowerCase().startsWith(prefix.toLowerCase()));
 }
-async function crawlProject(project,audit,signal,generatedAt,started) {
+async function crawlProject(project,audit,signal,generatedAt,started,viewport,deadlineExpired=false) {
   const limits=project.crawl,controller=new AbortController();let termination=null;
   const cancel=()=>{termination='cancelled';controller.abort();};
   signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted) cancel();
-  const timer=setTimeout(()=>{termination='deadline';controller.abort();},limits.maxDurationMs);
+  const remaining=deadlineExpired?0:limits.maxDurationMs-(performance.now()-started);
+  const timer=setTimeout(()=>{termination='deadline';controller.abort();},Math.max(1,remaining));
+  if(remaining<=0) {termination='deadline';controller.abort();}
   const origins=new Set(project.urls.map(url=>new URL(url).origin));
   const seen=new Set(project.urls),pages=[];
   const skipped={duplicate:0,outOfScope:0,unsupported:0,excluded:0,depth:0,pageLimit:0};
-  let frontier=project.urls.map(url=>({url,depth:0,sourceUrl:null})),linkLimitReached=false;
+  let frontier=project.urls.map(url=>({url,depth:0,sourceUrl:null,...(viewport?{viewport}:{})})),linkLimitReached=false;
   try {
     while(frontier.length) {
       const results=await auditTargets(frontier,project,audit,controller.signal);
@@ -73,7 +77,7 @@ async function crawlProject(project,audit,signal,generatedAt,started) {
           if(seen.has(url)) {skipped.duplicate++;continue;}
           if(page.depth>=limits.maxDepth) {skipped.depth++;continue;}
           if(seen.size>=limits.maxPages) {skipped.pageLimit++;continue;}
-          seen.add(url);next.push({url,depth:page.depth+1,sourceUrl:page.url});
+          seen.add(url);next.push({url,depth:page.depth+1,sourceUrl:page.url,...(viewport?{viewport}:{})});
         }
       }
       frontier=next;
@@ -85,8 +89,18 @@ async function crawlProject(project,audit,signal,generatedAt,started) {
 }
 export async function auditProject(input,{audit=auditPage,signal}={}) {
   const project=validateProject(input),started=performance.now(),generatedAt=new Date().toISOString();
-  if(project.crawl) return crawlProject(project,audit,signal,generatedAt,started);
-  const pages=await auditTargets(project.urls.map(url=>({url})),project,audit,signal);
+  if(project.crawl) {
+    if(!project.viewports) return crawlProject(project,audit,signal,generatedAt,started);
+    const pages=[],profiles=[];let deadlineExpired=false;
+    for(const viewport of project.viewports) {
+      const run=await crawlProject(project,audit,signal,generatedAt,started,viewport,deadlineExpired);
+      deadlineExpired ||= run.crawl.termination==='deadline';
+      pages.push(...run.pages);profiles.push({viewport,...run.crawl});
+    }
+    return finish(project,pages,generatedAt,started,{crawl:{profiles,truncated:profiles.some(p=>p.truncated),completeWithinScope:profiles.every(p=>p.completeWithinScope)}});
+  }
+  const targets=(project.viewports??[null]).flatMap(viewport=>project.urls.map(url=>({url,...(viewport?{viewport}:{})})));
+  const pages=await auditTargets(targets,project,audit,signal);
   return finish(project,pages,generatedAt,started);
 }
 export function projectExitCode(run,failOnViolations=false) {

@@ -4,10 +4,12 @@ import { summarize } from './report.js';
 import { normalizeUrl } from './url.js';
 import { createNetworkPolicy } from './network-policy.js';
 import { startEgressProxy } from './egress-proxy.js';
+import { validateViewport } from './viewport.js';
 
 export async function auditPage(url, { launch = options => chromium.launch(options),
-  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl } = {}) {
+  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport } = {}) {
   url = normalizeUrl(url);
+  if(viewport!==undefined) viewport=validateViewport(viewport);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) throw new Error('Invalid audit timeout');
   const controller = new AbortController();
   const cancel = () => controller.abort(new Error('Audit cancelled'));
@@ -33,7 +35,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     controller.signal.throwIfAborted();
     browser = await launch(launchOptions);
     controller.signal.throwIfAborted();
-    context = await browser.newContext({acceptDownloads:false, serviceWorkers:'block'});
+    context = await browser.newContext({acceptDownloads:false, serviceWorkers:'block',...(viewport?{viewport:{width:viewport.width,height:viewport.height}}:{})});
     controller.signal.throwIfAborted();
     if(policy) {
       await context.route('**/*',async route=>{
@@ -82,6 +84,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
       if(network) await page.waitForLoadState('networkidle',{timeout:timeoutMs});
       if(policy) policy.check(page.url(),true);
       const evidence=summarize(result,page.url(),{language});
+      if(viewport) evidence.viewport=viewport;
       if(crawl) evidence.discovery=await page.evaluate(limit=>{
         const elements=document.querySelectorAll('a[href]');const links=[];
         for(let i=0;i<Math.min(elements.length,limit);i++) links.push(elements[i].href);
