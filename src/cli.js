@@ -10,7 +10,7 @@ import { auditProject, projectExitCode } from './runner.js';
 import { renderProject } from './project-report.js';
 import { compareAudits, loadSnapshot } from './comparison.js';
 import { messages } from './i18n.js';
-import { saveHistory, latestHistory, listHistory, pruneHistory } from './history.js';
+import { saveHistory, latestHistory, listHistory, pruneHistory, projectKey } from './history.js';
 import { startHistoryViewer } from './viewer.js';
 import { loadWorkspace } from './workspace.js';
 
@@ -19,6 +19,7 @@ function usage() {
   console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
   console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
   console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
+  console.log('Import evidence: --project config.json --history directory --import-history saved.json');
 }
 export async function main(args=process.argv.slice(2)) {
   let opts;
@@ -43,6 +44,12 @@ export async function main(args=process.argv.slice(2)) {
     if (opts.project) {
       const project = await loadProject(opts.project);
       if (opts.lang) project.language = opts.lang;
+      if(opts['import-history']) {
+        const snapshot=await loadSnapshot(opts['import-history'],{enrich:true});
+        if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Imported history belongs to another project');
+        const id=await saveHistory(opts.history,snapshot);
+        console.log(JSON.stringify({schemaVersion:1,kind:'history-import',id}));return 0;
+      }
       if (opts.listHistory) { console.log(JSON.stringify(await listHistory(opts.history, project), null, 2)); return 0; }
       if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;

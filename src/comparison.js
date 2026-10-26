@@ -1,5 +1,6 @@
 import { open } from 'node:fs/promises';
 import { normalizeUrl, validateProject } from './project.js';
+import { ruleDetails, reviewDetails } from './snapshot-detail.js';
 
 const MAX_SNAPSHOT_BYTES = 20 * 1024 * 1024;
 function text(value, limit, label) {
@@ -13,6 +14,8 @@ function target(value, depth = 0) {
 }
 export function validateSnapshot(input) {
   if (!input || input.schemaVersion !== 1 || input.kind !== 'project-audit') throw new Error('Expected project-audit snapshot schemaVersion 1');
+  if(input.historyVersion!==undefined&&![1,2].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
+  const rich=input.historyVersion===2;
   const project=validateProject(input.project);
   if (!Array.isArray(input.pages) || (project.crawl ? input.pages.length<project.urls.length||input.pages.length>project.crawl.maxPages : input.pages.length!==project.urls.length)) throw new Error('Invalid snapshot page count');
   const seen=new Set();
@@ -33,19 +36,37 @@ export function validateSnapshot(input) {
     const violations=report.violations.map(rule=>{
       const id=text(rule.id,200,'rule');
       if (!Array.isArray(rule.nodes) || rule.nodes.length > 10000) throw new Error('Invalid snapshot nodes');
-      return {id,nodes:rule.nodes.map(node=>({target:target(node.target)}))};
+      return {id,...(rich?ruleDetails(rule):{}),nodes:rule.nodes.map(node=>({target:target(node.target)}))};
     });
     let network=null;
     if(report.network) {
       if(!Number.isInteger(report.network.policyVersion)||report.network.policyVersion<1) throw new Error('Invalid snapshot network policy version');
       network={policyVersion:report.network.policyVersion};
     }
-    return {url,status:'succeeded',...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,engine,network,violations}};
+    return {url,status:'succeeded',...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
   });
   for(const seed of project.urls) if(!seen.has(seed)) throw new Error('Snapshot omits a configured seed');
-  return {schemaVersion:1,kind:'project-audit',project,pages};
+  let generatedAt=null;
+  if(rich&&input.generatedAt!==undefined&&input.generatedAt!==null) {
+    if(typeof input.generatedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(input.generatedAt)||Number.isNaN(Date.parse(input.generatedAt))||new Date(input.generatedAt).toISOString()!==input.generatedAt) throw new Error('Invalid history timestamp');
+    generatedAt=input.generatedAt;
+  }
+  let coverageComplete=null;
+  if(rich) {
+    coverageComplete=input.coverageComplete??input.crawl?.completeWithinScope??(project.crawl?null:pages.every(page=>page.status==='succeeded'));
+    if(coverageComplete!==null&&typeof coverageComplete!=='boolean') throw new Error('Invalid history coverage');
+    if(coverageComplete===true&&pages.some(page=>page.status!=='succeeded')) throw new Error('Contradictory history coverage');
+  }
+  const tool=rich&&input.tool!=null?text(input.tool,128,'tool'):null;
+  const version=rich&&input.version!=null?text(input.version,128,'version'):null;
+  return {schemaVersion:1,kind:'project-audit',...(rich?{historyVersion:2,generatedAt,coverageComplete,tool,version}:{}),project,pages};
 }
-export async function loadSnapshot(path) {
+// Additive conversion: never invent missing metadata or rewrite the original record.
+export function upgradeSnapshot(input) {
+  if(input?.historyVersion!==undefined&&![1,2].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
+  return validateSnapshot({...input,historyVersion:2});
+}
+export async function loadSnapshot(path, {enrich=false}={}) {
   const file=await open(path,'r');
   try {
     if (!(await file.stat()).isFile()) throw new Error('Snapshot must be a file');
@@ -58,7 +79,7 @@ export async function loadSnapshot(path) {
     let input;
     try {input=JSON.parse(buffer.subarray(0,size).toString('utf8').replace(/^\uFEFF/,''));}
     catch {throw new Error('Snapshot must contain valid JSON');}
-    return validateSnapshot(input);
+    return enrich?upgradeSnapshot(input):validateSnapshot(input);
   } finally {await file.close();}
 }
 function findings(page) {

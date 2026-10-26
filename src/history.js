@@ -3,7 +3,7 @@ import { mkdir, open, rename, unlink, readdir, lstat, rmdir } from 'node:fs/prom
 import { setTimeout as delay } from 'node:timers/promises';
 import { join, resolve } from 'node:path';
 import { validateProject } from './project.js';
-import { validateSnapshot, loadSnapshot } from './comparison.js';
+import { upgradeSnapshot, loadSnapshot } from './comparison.js';
 
 // Scope changes share a history; comparison itself decides which pages are comparable.
 export function projectKey(project) {
@@ -36,7 +36,7 @@ async function locked(root, project, action) {
 }
 export async function saveHistory(root, run) {
   // Whitelist comparison evidence. Never persist HTML, errors or arbitrary report fields.
-  const snapshot = validateSnapshot(run);
+  const snapshot = upgradeSnapshot(run);
   const data = JSON.stringify(snapshot);
   if (Buffer.byteLength(data) > 20 * 1024 * 1024) throw new Error('History snapshot exceeds 20 MiB');
   return locked(root, snapshot.project, async path => {
@@ -88,6 +88,24 @@ export async function readHistory(root, project, ids) {
       snapshots.push(snapshot);
     }
     return snapshots;
+  });
+}
+
+// Bounded analytics window. Corrupt/missing records remain explicit gaps.
+export async function historyWindow(root, project) {
+  return locked(root, project, async path=>{
+    const ids=await records(path),rows=[];let bytes=0;
+    for(const id of ids.slice(0,10)) {
+      try {
+        const file=join(path,id),size=(await lstat(file)).size;
+        if(bytes+size>40*1024*1024) {rows.push({id,error:'budget'});continue;}
+        bytes+=size;
+        const snapshot=await loadSnapshot(file);
+        if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Foreign record');
+        rows.push({id,snapshot});
+      } catch {rows.push({id,error:'invalid'});}
+    }
+    return {total:ids.length,rows};
   });
 }
 

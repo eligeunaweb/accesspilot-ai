@@ -4,7 +4,7 @@ export function parse(args) {
   const opts = {format:'text', output:null, fail:false, url:null, project:null};
   for(let i=0;i<args.length;i++) {
     const arg=args[i];
-    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port') {
+    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history') {
       if(!args[i+1] || args[i+1].startsWith('--')) throw new Error(`Missing value for ${arg}`);
       opts[arg.slice(2)]=args[++i];
     } else if(arg==='--list-history') opts.listHistory=true;
@@ -32,12 +32,13 @@ export function parse(args) {
     opts.keepRuns=Number(opts['keep-runs']);
   } else if(opts['keep-runs']!==undefined || opts.applyRetention) throw new Error('--keep-runs and --apply-retention require --prune-history');
   if(opts.serveHistory && ((!opts.project && !opts.workspace) || !opts.history)) throw new Error('--serve-history requires --project or --workspace, and --history');
+  if(opts['import-history']&&(!opts.project||!opts.history)) throw new Error('--import-history requires --project and --history');
   if(opts.port!==undefined) {
     if(!opts.serveHistory || !/^(0|[1-9]\d{0,4})$/.test(opts.port) || Number(opts.port)>65535) throw new Error('--port requires --serve-history and an integer from 0 to 65535');
     opts.port=Number(opts.port);
   }
-  if(opts.listHistory || opts.pruneHistory || opts.serveHistory) {
-    if([opts.listHistory,opts.pruneHistory,opts.serveHistory].filter(Boolean).length>1) throw new Error('Choose one history operation');
+  if(opts.listHistory || opts.pruneHistory || opts.serveHistory || opts['import-history']) {
+    if([opts.listHistory,opts.pruneHistory,opts.serveHistory,opts['import-history']].filter(Boolean).length>1) throw new Error('Choose one history operation');
     if(opts.baseline || opts.output || opts.fail || opts.format!=='text') throw new Error('History maintenance cannot be combined with audit output or baseline options');
   }
   if(opts.project || opts.workspace) return opts;
