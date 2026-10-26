@@ -12,6 +12,6 @@ export function validateViewports(input) {
   if(new Set(profiles.map(p=>`${p.width}x${p.height}`)).size!==profiles.length) throw new Error('Viewport dimensions must be distinct');
   return profiles;
 }
-export const pageKey=page=>JSON.stringify([page.url,page.viewport?.name??null]);
+export const pageKey=page=>JSON.stringify([page.url,page.viewport?.name??null,page.journey?.name??null]);
 export const viewportLabel=viewport=>viewport?`${viewport.name} (${viewport.width} × ${viewport.height})`:'';
 export const sameViewport=(a,b)=>a?.name===b?.name&&a?.width===b?.width&&a?.height===b?.height;

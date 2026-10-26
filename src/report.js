@@ -1,3 +1,4 @@
+import { journeyLabel } from './journey.js';
 import { messages, languageCode, recommendation } from './i18n.js';
 import { viewportLabel } from './viewport.js';
 
@@ -41,9 +42,9 @@ export function findingRows(report) {
       JSON.stringify(node.target),node.failureSummary,rule.recommendation?.correction,rule.recommendation?.verification])));
 }
 export function csvReport(report) {
-  if(report.viewport||report.authentication) {
-    const columns=[...(report.viewport?[report.viewport.name,report.viewport.width,report.viewport.height]:[]),...(report.authentication?[report.authentication.profile]:[])];
-    return [[...csvHeaders,...(report.viewport?['viewport','viewport_width','viewport_height']:[]),...(report.authentication?['authentication_profile']:[])],...[
+  if(report.viewport||report.authentication||report.journey) {
+    const columns=[...(report.viewport?[report.viewport.name,report.viewport.width,report.viewport.height]:[]),...(report.authentication?[report.authentication.profile]:[]),...(report.journey?[report.journey.name]:[])];
+    return [[...csvHeaders,...(report.viewport?['viewport','viewport_width','viewport_height']:[]),...(report.authentication?['authentication_profile']:[]),...(report.journey?['journey']:[])],...[
       ['succeeded',report.url,'','','','','','',''],...findingRows(report)
     ].map(row=>[...row,...columns])].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
   }
@@ -70,7 +71,7 @@ export function pageReportBody(report, prefix = 'page') {
   }).join('');
   const nav=groups.filter(impact=>report.violations.some(rule=>(groups.includes(rule.impact)?rule.impact:'unknown')===impact))
     .map(impact=>`<li><a href="#${prefix}-${impact}">${impact === 'unknown' ? t.other : t[impact]}</a></li>`).join('');
-  return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p>${report.authentication?`<p>${lang==='es'?'Perfil de acceso':'Access profile'}: ${escapeHtml(report.authentication.profile)}</p>`:''}${report.viewport?`<p>Viewport: ${escapeHtml(viewportLabel(report.viewport))}</p>`:''}<p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${escapeHtml(report.passes)}; ${t.review}: ${escapeHtml(report.incomplete)}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${escapeHtml(report.incomplete)})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
+  return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p>${report.journey?`<p>${lang==='es'?'Punto del recorrido':'Journey checkpoint'}: ${escapeHtml(journeyLabel(report.journey))}</p>`:''}${report.authentication?`<p>${lang==='es'?'Perfil de acceso':'Access profile'}: ${escapeHtml(report.authentication.profile)}</p>`:''}${report.viewport?`<p>Viewport: ${escapeHtml(viewportLabel(report.viewport))}</p>`:''}<p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${escapeHtml(report.passes)}; ${t.review}: ${escapeHtml(report.incomplete)}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${escapeHtml(report.incomplete)})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
 }
 export function htmlDocument(title, language, body) {
   const lang=languageCode(language);

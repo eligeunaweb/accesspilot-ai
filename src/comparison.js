@@ -1,3 +1,4 @@
+import { validateJourney, sameJourney } from './journey.js';
 import { open } from 'node:fs/promises';
 import { normalizeUrl, validateProject } from './project.js';
 import { ruleDetails, reviewDetails } from './snapshot-detail.js';
@@ -18,7 +19,7 @@ export function validateSnapshot(input) {
   if(input.historyVersion!==undefined&&![1,2].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
   const rich=input.historyVersion===2;
   const project=validateProject(input.project);
-  const profiles=project.viewports??[null],count=profiles.length;
+  const profiles=project.viewports??[null],count=profiles.length*(project.journeys?.length??1);
   if (!Array.isArray(input.pages) || (project.crawl ? input.pages.length<project.urls.length*count||input.pages.length>project.crawl.maxPages*count : input.pages.length!==project.urls.length*count)) throw new Error('Invalid snapshot page count');
   const seen=new Set();
   const pages=input.pages.map(page=>{
@@ -26,7 +27,10 @@ export function validateSnapshot(input) {
     const requested=page.viewport==null?undefined:validateViewport(page.viewport);
     const viewport=project.viewports?.find(profile=>sameViewport(profile,requested));
     if(project.viewports&&!viewport || !project.viewports&&page.viewport!=null) throw new Error('Invalid snapshot viewport');
-    const identity=pageKey({url,viewport}),profile=viewport?{viewport}:{};
+    const requestedJourney=page.journey==null?undefined:validateJourney(page.journey);
+    const journey=project.journeys?.find(item=>sameJourney(item,requestedJourney));
+    if(project.journeys&&!journey||!project.journeys&&requestedJourney) throw new Error('Invalid snapshot journey');
+    const identity=pageKey({url,viewport,journey}),profile={...(viewport?{viewport}:{}),...(journey?{journey}:{})};
     const inScope=project.crawl ? project.urls.some(seed=>new URL(seed).origin===new URL(url).origin) : project.urls.includes(url);
     if(project.crawl&&(!Number.isInteger(page.depth)||page.depth<0||page.depth>project.crawl.maxDepth)) throw new Error('Invalid snapshot crawl depth');
     if (seen.has(identity) || !inScope) throw new Error('Invalid snapshot page scope');
@@ -35,6 +39,7 @@ export function validateSnapshot(input) {
     if (page.status !== 'succeeded') return {url,status:page.status,...profile,...(project.crawl?{depth:page.depth}:{})};
     const report=page.report;
     if (!report || report.schemaVersion !== 1 || report.kind !== 'page-audit') throw new Error('Invalid snapshot page report');
+    if(!sameJourney(report.journey,journey)) throw new Error('Snapshot report journey mismatch');
     const actual=report.viewport==null?undefined:validateViewport(report.viewport);
     if(!sameViewport(actual,viewport)) throw new Error('Snapshot report viewport mismatch');
     if(JSON.stringify(report.authentication??null)!==JSON.stringify(project.authentication??null)) throw new Error('Snapshot authentication evidence mismatch');
@@ -55,7 +60,7 @@ export function validateSnapshot(input) {
     }
     return {url,status:'succeeded',...profile,...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,...profile,...authentication,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
   });
-  for(const seed of project.urls) for(const viewport of profiles) if(!seen.has(pageKey({url:seed,viewport}))) throw new Error('Snapshot omits a configured seed/profile');
+  for(const seed of project.urls) for(const viewport of profiles) for(const journey of project.journeys??[null]) if(!seen.has(pageKey({url:seed,viewport,journey}))) throw new Error('Snapshot omits a configured seed/profile');
   let generatedAt=null;
   if(rich&&input.generatedAt!==undefined&&input.generatedAt!==null) {
     if(typeof input.generatedAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(input.generatedAt)||Number.isNaN(Date.parse(input.generatedAt))||new Date(input.generatedAt).toISOString()!==input.generatedAt) throw new Error('Invalid history timestamp');
@@ -108,10 +113,11 @@ export function compareAudits(beforeInput, afterInput) {
   const totals={comparablePages:0,incomparablePages:0,added:0,resolved:0,persistent:0};
   const pages=urls.map(identity=>{
     const oldPage=oldPages.get(identity),newPage=newPages.get(identity);
-    const selected=newPage??oldPage,url=selected.url,profile=selected.viewport?{viewport:selected.viewport}:{};
+    const selected=newPage??oldPage,url=selected.url,profile={...(selected.viewport?{viewport:selected.viewport}:{}),...(selected.journey?{journey:selected.journey}:{})};
     let reason;
     if(fingerprint(before.project)!==fingerprint(after.project)) reason='policy-changed';
     else if (!oldPage || !newPage) reason='scope-changed';
+    else if(!sameJourney(oldPage.journey,newPage.journey)) reason='journey-changed';
     else if(!sameViewport(oldPage.viewport,newPage.viewport)) reason='viewport-changed';
     else if (oldPage.status !== 'succeeded' || newPage.status !== 'succeeded') reason='page-not-audited';
     else if (oldPage.report.url !== newPage.report.url) reason='destination-changed';

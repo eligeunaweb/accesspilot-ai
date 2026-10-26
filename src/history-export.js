@@ -1,3 +1,4 @@
+import { journeyLabel } from './journey.js';
 import { validateSnapshot } from './comparison.js';
 import { csvCell, htmlDocument, escapeHtml } from './report.js';
 import { languageCode, recommendation, messages } from './i18n.js';
@@ -22,16 +23,16 @@ export function exportHistory(input,format,language) {
       rows.push(line);
     };
     const auth=snapshot.project.authentication;
-    const add=(row,viewport)=>emit([...row,viewport?.name??'',viewport?.width??'',viewport?.height??'',...(auth?[auth.profile]:[])]);
-    emit(['record_type','status','url','rule','severity','wcag','target','correction','verification','guidance_source','coverage_complete','review_rules','viewport','viewport_width','viewport_height',...(auth?['authentication_profile']:[])]);
+    const add=(row,viewport,journey)=>emit([...row,viewport?.name??'',viewport?.width??'',viewport?.height??'',...(auth?[auth.profile]:[]),...(snapshot.project.journeys?[journeyLabel(journey)]:[])]);
+    emit(['record_type','status','url','rule','severity','wcag','target','correction','verification','guidance_source','coverage_complete','review_rules','viewport','viewport_width','viewport_height',...(auth?['authentication_profile']:[]),...(snapshot.project.journeys?['journey']:[])]);
     add(['run','','','','','','','','','',metrics.complete??'unknown',metrics.review??'unknown']);
     for(const page of snapshot.pages) {
-      add(['page',page.status,page.url,'','','','','','','','',''],page.viewport);
+      add(['page',page.status,page.url,'','','','','','','','',''],page.viewport,page.journey);
       if(!page.report) continue;
-      if(page.report.incomplete==null||page.report.incompleteDetails==null) add(['review-unavailable','unknown',page.url,'','','','','','','','',''],page.viewport);
+      if(page.report.incomplete==null||page.report.incompleteDetails==null) add(['review-unavailable','unknown',page.url,'','','','','','','','',''],page.viewport,page.journey);
       for(const [kind,rules] of [['violation',page.report.violations],['review',page.report.incompleteDetails??[]]]) for(const rule of rules) {
         const {advice,source}=guidance(rule,lang);
-        for(const node of rule.nodes.length?rule.nodes:[{target:null}]) add([kind,page.status,page.url,rule.id,rule.impact??'unknown',(rule.wcag??[]).join('; '),node.target===null?'':JSON.stringify(node.target),advice.correction,advice.verification,source,'',''],page.viewport);
+        for(const node of rule.nodes.length?rule.nodes:[{target:null}]) add([kind,page.status,page.url,rule.id,rule.impact??'unknown',(rule.wcag??[]).join('; '),node.target===null?'':JSON.stringify(node.target),advice.correction,advice.verification,source,'',''],page.viewport,page.journey);
       }
     }
     return rows.join('');
@@ -46,7 +47,7 @@ export function exportHistory(input,format,language) {
       <ul>${rule.nodes.map(node=>`<li><code>${escapeHtml(JSON.stringify(node.target))}</code></li>`).join('')}</ul></details>`;
   }).join('');
   const pages=snapshot.pages.map((page,index)=>{
-    const title=escapeHtml(page.url+' '+viewportLabel(page.viewport));
+    const title=escapeHtml(page.url+' '+viewportLabel(page.viewport)+' '+journeyLabel(page.journey));
     if(!page.report) return `<section><h2>${title}</h2><p>${escapeHtml(t[page.status])}</p></section>`;
     const report=page.report;
     return `<section><h2>${title}</h2><p>${escapeHtml(t[page.status])}</p><p>${escapeHtml(t.passed)}: ${escapeHtml(report.passes??unknown)}</p>

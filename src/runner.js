@@ -1,3 +1,4 @@
+import { sameJourney } from './journey.js';
 import { validateSessionState } from './session.js';
 import { performance } from 'node:perf_hooks';
 import { auditPage } from './audit.js';
@@ -14,14 +15,15 @@ async function auditTargets(targets, project, audit, signal) {
       const started=performance.now();
       try {
         const report=await audit(url,{signal,timeoutMs:project.timeoutMs,language:project.language,
-          network:project.network,scopeUrls:project.urls,crawl:project.crawl,viewport:target.viewport});
+          network:project.network,scopeUrls:project.urls,crawl:project.crawl,viewport:target.viewport,journey:target.journey});
         if(target.viewport&&!sameViewport(validateViewport(report.viewport),target.viewport)) throw new Error('Audit viewport evidence does not match the requested profile');
+        if(!sameJourney(report.journey,target.journey)) throw new Error('Journey evidence does not match the requested checkpoint');
         if(project.authentication&&JSON.stringify(report.authentication)!==JSON.stringify(project.authentication)) throw new Error('Authentication evidence does not match the requested profile');
         if(signal?.aborted) throw new Error('Audit cancelled');
         pages[index]={...target,status:'succeeded',durationMs:Math.round(performance.now()-started),report};
       } catch(error) {
         pages[index]={...target,status:signal?.aborted?'cancelled':'failed',durationMs:Math.round(performance.now()-started),
-          error:project.authentication?'Authenticated audit failed; session may be expired or access marker missing':error instanceof Error?error.message:'Audit failed'};
+          error:project.authentication?'Authenticated audit failed; session may be expired or access marker missing':target.journey?'Interactive audit failed; checkpoint, action or network scope could not be verified':error instanceof Error?error.message:'Audit failed'};
       }
     }
   }
@@ -105,7 +107,7 @@ export async function auditProject(input,{audit=auditPage,signal,sessionState}={
     }
     return finish(project,pages,generatedAt,started,{crawl:{profiles,truncated:profiles.some(p=>p.truncated),completeWithinScope:profiles.every(p=>p.completeWithinScope)}});
   }
-  const targets=(project.viewports??[null]).flatMap(viewport=>project.urls.map(url=>({url,...(viewport?{viewport}:{})})));
+  const targets=(project.viewports??[null]).flatMap(viewport=>project.urls.flatMap(url=>(project.journeys??[null]).map(journey=>({url,...(viewport?{viewport}:{}),...(journey?{journey}:{})}))));
   const pages=await auditTargets(targets,project,audit,signal);
   return finish(project,pages,generatedAt,started);
 }

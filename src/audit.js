@@ -1,3 +1,4 @@
+import { validateJourney, runJourney } from './journey.js';
 import { validateSessionState, validateAuthentication } from './session.js';
 import { validateNetwork } from './network-policy.js';
 import { chromium } from 'playwright';
@@ -9,8 +10,9 @@ import { startEgressProxy } from './egress-proxy.js';
 import { validateViewport } from './viewport.js';
 
 export async function auditPage(url, { launch = options => chromium.launch(options),
-  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport, authentication, sessionState } = {}) {
+  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport, authentication, sessionState, journey } = {}) {
   url = normalizeUrl(url);
+  if(journey!==undefined) {journey=validateJourney(journey);network=validateNetwork(network);}
   if(authentication!==undefined) {
     network=validateNetwork(network);
     authentication=validateAuthentication(authentication,scopeUrls,network);
@@ -91,11 +93,15 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
         try {await page.locator(authentication.readySelector).waitFor({state:'visible',timeout:Math.min(timeoutMs,5000)});}
         catch {throw new Error('Authenticated access marker missing');}
       }
+      if(journey) await runJourney(page,journey,{signal:controller.signal,timeoutMs});
       const result=await analyze(page);
       if(network) await page.waitForLoadState('networkidle',{timeout:timeoutMs});
       if(policy) policy.check(page.url(),true);
+      if(journey&&!await page.locator(journey.readySelector).isVisible()) throw new Error('Journey checkpoint changed during audit');
+      if(authentication&&!await page.locator(authentication.readySelector).isVisible()) throw new Error('Authenticated access changed during audit');
       const evidence=summarize(result,page.url(),{language});
       if(viewport) evidence.viewport=viewport;
+      if(journey) evidence.journey=journey;
       if(authentication) evidence.authentication={...authentication};
       if(crawl) evidence.discovery=await page.evaluate(limit=>{
         const elements=document.querySelectorAll('a[href]');const links=[];
