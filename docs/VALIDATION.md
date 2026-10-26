@@ -163,6 +163,16 @@ Native matrix results after that setup change must be checked on the new commit.
 
 # Multi-project dashboard and filters / Panel multiproyecto — 2026-10-26
 
+CI follow-up on workspace head 0043ff2: macOS Node 22/24, Windows Node 22/24
+and Ubuntu Node 24 passed. Ubuntu Node 22 was cancelled before suite completion.
+Logs from job 121695885272 show installation from 16:20:11 to 16:34:56 UTC,
+including repeated Azure Ubuntu mirror retries. Tests started at 16:34:56 and
+passed the displayed CLI fixtures until cancellation at 16:35:20, around the
+15-minute job budget. No complete green matrix is claimed. The CI-only follow-up
+provides a 30-minute job budget, 20-minute install step and a separate 5-minute
+test limit. Its native run must validate those revised budgets; product source
+and the 175-test local result are unchanged.
+
 - Full local suite: **175 passed, 0 failed, 0 skipped**, 26.48 seconds,
   Windows / Node 24.11.1. No dependencies added.
 - Same documented host command: `node --import ./tests/helpers/outer-sandbox.js --test`,

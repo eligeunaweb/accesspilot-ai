@@ -8,7 +8,7 @@ permissions:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -23,10 +23,12 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+        timeout-minutes: 20
       - name: Permit Chromium user namespaces on Ubuntu
         if: runner.os == 'Linux'
         run: |
           node scripts/ci-apparmor.js
           sudo apparmor_parser -r "$RUNNER_TEMP/accesspilot-playwright-userns"
       - run: npm test
+        timeout-minutes: 5
       - run: npm audit --audit-level=high
