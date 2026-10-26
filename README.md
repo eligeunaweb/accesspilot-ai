@@ -202,5 +202,7 @@ test environment exceptions and remaining deployment gates.
 Use `--project config.json --history .accesspilot-history --baseline latest` to
 save comparison evidence and compare the previous run automatically.
 Use `--list-history` with the same project and history directory to list saved runs.
+Preview count-based retention with `--prune-history --keep-runs 30`; add
+`--apply-retention` to apply it. Maintenance never launches the browser.
 See [history documentation / documentación del historial](docs/HISTORY.md) for
 privacy, storage guarantees and remaining limitations.

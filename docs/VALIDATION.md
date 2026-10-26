@@ -117,3 +117,20 @@ Native matrix results after that setup change must be checked on the new commit.
   future-schema migrations and the history web viewer remain unimplemented or
   unvalidated. See HISTORY.md for storage/privacy guarantees.
 
+# Count-based retention validation / Retención por número — 2026-10-26
+
+- Full suite: 159 passed, 0 failed, 0 skipped, 28.75 seconds, Windows / Node 24.11.1.
+- Real CLI E2E saved two browser/axe runs, previewed keeping one without deletion,
+  applied retention and verified only one record remained.
+- Unit tests exercised concurrent writes/pruning, idempotence, preservation of
+  unrelated files and other projects, invalid limits, corruption/foreign-record
+  refusal before deletion and fail-closed abandoned-lock handling.
+- Same host-specific command and test-only browser adapter as the local-history
+  validation below; writable workspace TEMP/TMP, installed browser cache and
+  network permission for controlled local fixtures were required.
+- No new dependencies. No native CI result is claimed for this new change yet.
+- Lock crash recovery is manual; all cooperating processes must use this version.
+  I/O failure midway through unlinking can leave partial retention progress.
+  Power-loss, network filesystem semantics and hostile local writers are outside
+  these guarantees. Automatic scheduled/age/size retention is not implemented.
+
