@@ -212,6 +212,10 @@ New history records retain severity, WCAG, guidance and incomplete review eviden
 Use run-detail filters, bounded trends and JSON/HTML/CSV downloads in the viewer.
 Import compatible project JSON with `--import-history audit.json` alongside
 `--project` and `--history`. See [rich history / historial enriquecido](docs/RICH-HISTORY.md).
+Add optional named `viewports` to a project to audit multiple CSS screen sizes.
+See [responsive audits / auditorías por tamaño](docs/RESPONSIVE-AUDITS.md) and
+[example configuration](examples/responsive.json). Profiles remain distinct in
+history, comparisons and exports; changing dimensions never counts as a fix.
 Preview count-based retention with `--prune-history --keep-runs 30`; add
 `--apply-retention` to apply it. Maintenance never launches the browser.
 See [history documentation / documentación del historial](docs/HISTORY.md) for

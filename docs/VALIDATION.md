@@ -233,3 +233,13 @@ and the 175-test local result are unchanged.
   authenticated/responsive journeys, scheduler/API jobs and release/install gates.
   See RICH-HISTORY.md for persisted fields, migration and export limitations.
 
+
+## Responsive profiles / Perfiles responsive — 2026-10-26
+
+197 tests passed, zero failures, cancellations or skips; 27.486 seconds on Windows / Node 24.11.1. Full transcript: tests-responsive-verified.txt in the task outputs. Real Chromium fixtures verify CSS breakpoint-dependent axe findings, independent mobile/desktop link discovery, CLI CSV, history identity and accessible viewer rendering. Tests cover strict configuration, total budgets, shared concurrency/deadline, cancellation, profile mismatches and prevention of false resolutions when dimensions change.
+
+The preceding run exposed a fractional-timer boundary: a second profile could start after the first deadline callback. Deadline exhaustion is now explicitly carried to subsequent profiles; the complete suite passed after this correction. An earlier negative fixture was corrected to avoid shared object aliases.
+
+Local execution uses the documented test-only outer-sandbox adapter, workspace browser cache and temporary directory. This does not validate native Chromium sandbox behavior. Native Windows/Linux/macOS CI for this new revision remains pending; six jobs passed for the preceding 9585be0 revision. No device, touch, zoom or screen-reader emulation is claimed. No dependencies added. No merge, release or deployment performed.
+
+197 pruebas aprobadas, sin fallos ni omisiones. Los perfiles cambian el viewport CSS; no sustituyen la revisión manual con tecnologías de asistencia. La validación nativa multiplataforma de esta revisión sigue pendiente.

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "name": "Responsive project",
+  "language": "es",
+  "urls": ["https://example.org/"],
+  "concurrency": 2,
+  "viewports": [
+    {"name": "mobile", "width": 375, "height": 812},
+    {"name": "tablet", "width": 768, "height": 1024},
+    {"name": "desktop", "width": 1280, "height": 800}
+  ],
+  "crawl": {"maxPages": 20, "maxDepth": 2, "maxDurationMs": 120000}
+}
