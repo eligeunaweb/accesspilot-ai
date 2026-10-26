@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
@@ -13,6 +13,7 @@ import AxeBuilder from '@axe-core/playwright';
 import './helpers/outer-sandbox.js';
 import { saveHistory, readHistory, listHistory, projectKey } from '../src/history.js';
 import { startHistoryViewer } from '../src/viewer.js';
+import { richFixture } from './fixtures/rich-history.js';
 
 function snapshot(selectors=['#image']) {
   return {schemaVersion:1,kind:'project-audit',project:{schemaVersion:1,name:'AccessPilot · <img src=x onerror="window.compromised=true">',urls:['https://example.org'],language:'es'},
@@ -229,4 +230,69 @@ test('CLI starts a workspace dashboard without scanning unlisted histories', {ti
   const response=await http(url);assert.equal(response.status,200);assert.match(response.body,/Listed only/);
   assert.ok(!response.body.includes(f.project.name));
   assert.equal((await http(url+projectKey(f.project)+'/')).status,404);
+});
+
+test('rich detail filters and bounded trends are accessible and preserve full exports', {timeout:60000},async t=>{
+  const root=await mkdtemp(join(tmpdir(),'accesspilot-rich-view-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const run=richFixture();await saveHistory(root,run);
+  const after=richFixture();after.pages[0].report.violations=[];await saveHistory(root,after);
+  const id=await saveHistory(root,run);
+  const viewer=await startHistoryViewer({root,project:run.project});t.after(()=>viewer.close());
+  for(const params of ['severity=high','text=x','view=unknown','view=trends&q=x','run='+id+'&severity=high']) assert.equal((await http(viewer.url+'?'+params)).status,400);
+  const full=await http(viewer.url+'?run='+id+'&download=json');assert.equal(JSON.parse(full.body).pages[0].report.incomplete,1);
+  const offline=await http(viewer.url+'?run='+id+'&download=html&lang=es');assert.equal(offline.status,200);
+  assert.match(offline.headers['content-disposition'],/\.html/);assert.ok(!offline.body.includes(new URL(viewer.url).pathname));
+  const csv=await http(viewer.url+'?run='+id+'&download=csv');assert.equal(csv.status,200);assert.match(csv.body,/review/);
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+  const context=await browser.newContext({viewport:{width:375,height:812}}),page=await context.newPage();
+  await page.setContent(offline.body);
+  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
+  for(const lang of ['es','en']) {
+    await page.goto(viewer.url+'?'+new URLSearchParams({run:id,lang}));
+    await page.locator('main > details > summary').first().click();
+    assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  await page.getByLabel('Severity',{exact:true}).selectOption('moderate');
+  await page.getByLabel('Evidence type',{exact:true}).selectOption('review');
+  await page.getByLabel('Page, rule, WCAG criterion or selector').fill('1.4.3');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await page.waitForURL(url=>url.searchParams.get('severity')==='moderate');
+  await page.locator('main > details > summary').first().click();
+  await page.locator('main > details details > summary').first().click();
+  assert.match(await page.locator('main').innerText(),/color-contrast/);
+  assert.ok(!(await page.locator('main > details').innerText()).includes('image-alt'));
+  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
+  for(const lang of ['es','en']) {
+    await page.goto(viewer.url+'?view=trends&lang='+lang);
+    assert.equal(await page.locator('tbody tr').count(),3);
+    assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  if(process.env.ACCESSPILOT_RICH_SCREENSHOT) {
+    await page.setViewportSize({width:1280,height:900});
+    await page.goto(viewer.url+'?run='+id+'&lang=es');
+    await page.locator('main > details > summary').first().click();
+    await page.locator('main > details details > summary').first().click();
+    await page.screenshot({path:process.env.ACCESSPILOT_RICH_SCREENSHOT,fullPage:true});
+  }
+});
+
+test('CLI import preserves originals and rejects another project', {timeout:20000},async t=>{
+  const root=await mkdtemp(join(tmpdir(),'accesspilot-import-'));t.after(()=>rm(root,{recursive:true,force:true}));
+  const run=richFixture(),config=join(root,'project.json'),source=join(root,'original.json');
+  await writeFile(config,JSON.stringify(run.project));await writeFile(source,JSON.stringify(run));
+  const cli=fileURLToPath(new URL('../src/cli.js',import.meta.url));
+  const execute=()=>new Promise((resolve,reject)=>{
+    const child=spawn(process.execPath,[cli,'--project',config,'--history',join(root,'store'),'--import-history',source],{windowsHide:true});
+    let out='',err='';child.stdout.on('data',chunk=>out+=chunk);child.stderr.on('data',chunk=>err+=chunk);
+    child.on('error',reject);child.on('close',code=>resolve({code,out,err}));
+  });
+  const imported=await execute();assert.equal(imported.code,0,imported.err);
+  const [saved]=await readHistory(join(root,'store'),run.project,[JSON.parse(imported.out).id]);
+  assert.equal(saved.pages[0].report.violations[0].impact,'serious');
+  assert.equal(saved.pages[0].report.incompleteDetails[0].id,'color-contrast');
+  const original=JSON.stringify(run);assert.equal(await readFile(source,'utf8'),original);
+  await writeFile(config,JSON.stringify({...run.project,name:'Another'}));
+  const rejected=await execute();assert.equal(rejected.code,2);assert.match(rejected.err,/another project/);
 });
