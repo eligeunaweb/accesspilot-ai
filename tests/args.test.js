@@ -20,3 +20,11 @@ test('retention requires explicit, bounded and unambiguous maintenance options',
   assert.equal(parse([...base,'--keep-runs','2']).applyRetention,undefined);
   assert.equal(parse([...base,'--keep-runs','2','--apply-retention']).keepRuns,2);
 });
+test('viewer requires project history, bounded port and exclusive operation',()=>{
+  const base=['--project','p.json','--history','store','--serve-history'];
+  assert.equal(parse(base).serveHistory,true);
+  assert.equal(parse([...base,'--port','0']).port,0);
+  for(const extra of [['--port','65536'],['--port','-1'],['--port','0.5'],['--port','01'],['--list-history'],['--output','file.html'],['--baseline','latest']]) assert.throws(()=>parse([...base,...extra]));
+  assert.throws(()=>parse(['--project','p.json','--serve-history']));
+  assert.throws(()=>parse(['--project','p.json','--port','8080']));
+});

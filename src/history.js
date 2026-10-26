@@ -73,6 +73,24 @@ export async function latestHistory(root, project) {
   });
 }
 
+// Resolve record IDs under the same lock as retention; callers never supply paths.
+export async function readHistory(root, project, ids) {
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 2 || ids.some(id => typeof id !== 'string')) throw new Error('Expected one or two history IDs');
+  return locked(root, project, async path => {
+    const available = new Set(await records(path));
+    if (ids.some(id => !available.has(id))) {
+      const error = new Error('History record not found'); error.code = 'HISTORY_NOT_FOUND'; throw error;
+    }
+    const snapshots = [];
+    for (const id of ids) {
+      const snapshot = await loadSnapshot(join(path, id));
+      if (projectKey(snapshot.project) !== projectKey(project)) throw new Error('History record belongs to another project');
+      snapshots.push(snapshot);
+    }
+    return snapshots;
+  });
+}
+
 // Preview by default. Deletion is scoped to validated records of one named project.
 export async function pruneHistory(root, project, {keep, apply=false} = {}) {
   if (!Number.isInteger(keep) || keep < 1 || keep > 10000) throw new Error('keep must be an integer between 1 and 10000');
