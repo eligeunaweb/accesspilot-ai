@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "Mi espacio de auditorías / My audit workspace",
+  "language": "es",
+  "projects": [
+    {"schemaVersion": 1, "name": "Portfolio", "urls": ["https://example.org/"]},
+    {"schemaVersion": 1, "name": "Store", "urls": ["https://example.com/"]}
+  ]
+}

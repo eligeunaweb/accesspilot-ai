@@ -46,11 +46,11 @@ export function validateProject(input) {
     timeoutMs: integer(input.timeoutMs, 30000, 1000, 120000, 'timeoutMs')
   };
 }
-export async function loadProject(path) {
+export async function readConfiguration(path, label='Project') {
   // Read a bounded buffer, rather than loading an arbitrarily large input file.
   const file = await open(path, 'r');
   try {
-    if (!(await file.stat()).isFile()) throw new Error('Project path must be a file');
+    if (!(await file.stat()).isFile()) throw new Error(`${label} path must be a file`);
     const buffer = Buffer.alloc(MAX_CONFIG_BYTES + 1);
     let size = 0;
     while (size < buffer.length) {
@@ -58,10 +58,13 @@ export async function loadProject(path) {
       if (!bytesRead) break;
       size += bytesRead;
     }
-    if (size > MAX_CONFIG_BYTES) throw new Error('Project configuration exceeds 1 MiB');
+    if (size > MAX_CONFIG_BYTES) throw new Error(`${label} configuration exceeds 1 MiB`);
     let input;
     try { input = JSON.parse(buffer.subarray(0, size).toString('utf8').replace(/^\uFEFF/, '')); }
-    catch { throw new Error('Project configuration must be valid JSON'); }
-    return validateProject(input);
+    catch { throw new Error(`${label} configuration must be valid JSON`); }
+    return input;
   } finally { await file.close(); }
+}
+export async function loadProject(path) {
+  return validateProject(await readConfiguration(path));
 }

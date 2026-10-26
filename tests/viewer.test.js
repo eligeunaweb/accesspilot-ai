@@ -25,6 +25,11 @@ async function fixture(t) {
   const first=await saveHistory(root,run),next=await saveHistory(root,snapshot(['#new','<script>window.compromised=true</script>']));
   return {root,project:run.project,first,next};
 }
+function projectSnapshot(project) {
+  const run=snapshot();run.project=project;
+  run.pages[0].url=project.urls[0];run.pages[0].report.url=project.urls[0];
+  return run;
+}
 function http(url,{method='GET',headers={}}={}) {
   return new Promise((resolve,reject)=>{
     const req=request(url,{method,headers},res=>{
@@ -101,8 +106,67 @@ test('viewer handles empty history, pagination and independent session tokens',a
   const first=await http(viewer.url),second=await http(viewer.url+'?page=2');
   assert.equal((first.body.match(/class="run-id"/g)??[]).length,50);
   assert.equal((second.body.match(/class="run-id"/g)??[]).length,3);
+  const filtered=await http(viewer.url+'?q=2025-01&from=2025-01-01&to=2025-01-01');
+  assert.equal((filtered.body.match(/class="run-id"/g)??[]).length,50);
+  assert.match(filtered.body,/q=2025-01&amp;from=2025-01-01&amp;to=2025-01-01&amp;page=2/);
+  const last=await http(viewer.url+'?q=2025-01&from=2025-01-01&to=2025-01-01&page=2');
+  assert.equal((last.body.match(/class="run-id"/g)??[]).length,1);
+  assert.match(filtered.body,new RegExp('after='+f.next));
+  const unmatched=await http(viewer.url+'?q=nothing-matches');assert.equal(unmatched.status,200);assert.match(unmatched.body,/No hay ejecuciones que coincidan/);
+  for(const query of ['from=2023-02-29','from=2025-01-02&to=2025-01-01','q=%00','q=x&q=y','run='+f.first+'&q=x']) assert.equal((await http(viewer.url+'?'+query)).status,400);
   assert.notEqual(new URL(viewer.url).pathname,new URL(empty.url).pathname);
   assert.equal((await http(new URL(empty.url).origin+new URL(viewer.url).pathname)).status,404);
+});
+
+test('workspace dashboard allowlists projects and isolates their record lookups',async t=>{
+  const f=await fixture(t),second={schemaVersion:1,name:'Store',urls:['https://store.example']},hidden={...second,name:'Private project'};
+  await saveHistory(f.root,projectSnapshot(second));
+  await saveHistory(f.root,projectSnapshot(hidden));
+  const blocked={...second,name:'Unavailable project',urls:['https://unavailable.example']};
+  await writeFile(join(f.root,projectKey(blocked)),'not a directory');
+  const workspace={schemaVersion:1,name:'Agency',language:'en',projects:[f.project,second,blocked]};
+  const viewer=await startHistoryViewer({root:f.root,workspace});t.after(()=>viewer.close());
+  const home=await http(viewer.url);assert.equal(home.status,200);assert.match(home.body,/Project dashboard/);
+  assert.match(home.body,/History unavailable/);assert.match(home.body,/Store/);assert.ok(!home.body.includes('Private project'));
+  const search=await http(viewer.url+'?q=store.example');assert.match(search.body,/Store/);assert.ok(!search.body.includes('Unavailable project'));
+  const storeURL=viewer.url+projectKey(second)+'/';
+  assert.equal((await http(storeURL)).status,200);
+  assert.equal((await http(storeURL+'?run='+f.first)).status,404);
+  const storeIds=await listHistory(f.root,second);
+  assert.equal((await http(storeURL+'?before='+f.first+'&after='+storeIds[0])).status,404);
+  assert.equal((await http(viewer.url+projectKey(hidden)+'/')).status,404);
+  assert.equal((await http(viewer.url+'..%2Fprivate/')).status,404);
+  for(const params of ['run='+f.first,'page=2','from=2025-01-01','q=%00','q=one&q=two']) assert.equal((await http(viewer.url+'?'+params)).status,400);
+});
+
+test('workspace dashboard and native filter forms pass axe and work on mobile', {timeout:60000},async t=>{
+  const f=await fixture(t),second={schemaVersion:1,name:'Store',urls:['https://store.example']};
+  await saveHistory(f.root,projectSnapshot(second));
+  const viewer=await startHistoryViewer({root:f.root,workspace:{schemaVersion:1,name:'Agency',projects:[f.project,second],language:'es'}});t.after(()=>viewer.close());
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+  const context=await browser.newContext({viewport:{width:375,height:812}}),page=await context.newPage();
+  for(const lang of ['es','en']) {
+    await page.goto(viewer.url+'?lang='+lang);
+    assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
+    const positions=await page.locator('.projects-grid > section').evaluateAll(elements=>elements.map(element=>element.getBoundingClientRect().x));
+    assert.equal(positions.length,2);assert.equal(positions[0],positions[1]);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  }
+  await page.getByLabel('Project name or URL').fill('store.example');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await page.waitForURL(url=>url.searchParams.get('q')==='store.example');
+  assert.equal(await page.getByRole('link',{name:'Open history',exact:true}).count(),1);
+  await page.getByRole('link',{name:'Open history',exact:true}).focus();await page.keyboard.press('Enter');
+  await page.waitForURL(url=>url.pathname.includes(projectKey(second)));
+  await page.getByLabel('Run date or identifier').fill('no-matching-id');
+  await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+  await page.waitForURL(url=>url.searchParams.get('q')==='no-matching-id');
+  assert.match(await page.locator('main').innerText(),/No runs match/);
+  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.getByRole('link',{name:'Clear filters'}).click();
+  await page.waitForURL(url=>!url.searchParams.has('q'));
+  assert.equal(await page.getByRole('link',{name:'View run',exact:true}).count(),1);
 });
 
 test('history UI works with keyboard, mobile viewport and axe in both languages', {timeout:60000},async t=>{
@@ -150,4 +214,19 @@ test('CLI starts the read-only viewer without auditing configured URLs', {timeou
   });
   assert.equal((await http(url)).status,200);
   assert.equal((await listHistory(f.root,f.project)).length,2);
+});
+
+test('CLI starts a workspace dashboard without scanning unlisted histories', {timeout:20000},async t=>{
+  const f=await fixture(t),config=join(f.root,'workspace.json');
+  const listed={schemaVersion:1,name:'Listed only',urls:['https://unreachable.invalid']};
+  await writeFile(config,JSON.stringify({schemaVersion:1,name:'Agency',projects:[listed],language:'en'}));
+  const child=spawn(process.execPath,[fileURLToPath(new URL('../src/cli.js',import.meta.url)),'--workspace',config,'--history',f.root,'--serve-history'],{windowsHide:true});
+  let errors='';child.stderr.on('data',chunk=>errors+=chunk);t.after(()=>child.kill());
+  const url=await new Promise((resolve,reject)=>{
+    let output='';child.stdout.on('data',chunk=>{output+=chunk;const match=output.match(/http:\/\/127\.0\.0\.1:\d+\/[a-f0-9]{64}\//);if(match) resolve(match[0]);});
+    child.on('error',reject);child.on('exit',code=>reject(new Error(`Dashboard exited ${code}: ${errors}`)));
+  });
+  const response=await http(url);assert.equal(response.status,200);assert.match(response.body,/Listed only/);
+  assert.ok(!response.body.includes(f.project.name));
+  assert.equal((await http(url+projectKey(f.project)+'/')).status,404);
 });
