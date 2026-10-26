@@ -59,10 +59,10 @@ export function pageReportBody(report, prefix = 'page') {
   const groups=['critical','serious','moderate','minor','unknown'];
   const sections=groups.map(impact=>{
     const rules=report.violations.filter(rule=>(groups.includes(rule.impact)?rule.impact:'unknown')===impact);
-    return rules.length ? `<section id="${prefix}-${impact}"><h3>${t[impact] ?? t.other} (${rules.length})</h3>${rules.map(rule=>renderFinding(rule,lang)).join('')}</section>` : '';
+    return rules.length ? `<section id="${prefix}-${impact}"><h3>${impact === 'unknown' ? t.other : t[impact]} (${rules.length})</h3>${rules.map(rule=>renderFinding(rule,lang)).join('')}</section>` : '';
   }).join('');
   const nav=groups.filter(impact=>report.violations.some(rule=>(groups.includes(rule.impact)?rule.impact:'unknown')===impact))
-    .map(impact=>`<li><a href="#${prefix}-${impact}">${t[impact] ?? t.other}</a></li>`).join('');
+    .map(impact=>`<li><a href="#${prefix}-${impact}">${impact === 'unknown' ? t.other : t[impact]}</a></li>`).join('');
   return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p><p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${escapeHtml(report.passes)}; ${t.review}: ${escapeHtml(report.incomplete)}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${escapeHtml(report.incomplete)})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
 }
 export function htmlDocument(title, language, body) {

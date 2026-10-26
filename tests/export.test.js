@@ -42,3 +42,9 @@ test('project CSV includes failed pages instead of hiding untested targets',()=>
   const csv=renderProject({project:{name:'X'},pages:[{report},{status:'failed',url:'https://failed.org',error:'=bad'}]},'csv');
   assert.match(csv,/failed.org/);assert.ok(csv.includes('"\'=bad"'));assert.match(csv,/"review"/);
 });
+
+test('unknown severity has its own label rather than a WCAG mapping message',()=>{
+  const input={...results,violations:[{...rule,impact:null}]};
+  const html=htmlReport(summarize(input,'https://example.org',{language:'es'}));
+  assert.ok(html.includes('<h3>Desconocida (1)</h3>'));
+});

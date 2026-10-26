@@ -32,7 +32,7 @@ La fase 1 conserva la CLI y sus informes; multipágina, CSV, traducciones de rec
 
 2026-10-26. Nine alternatives reviewed using official sources; no commercial accounts or comparative detection benchmarks used.
 
-- 83 tests passed locally on Windows / Node 24.11.1; zero failures and skips in the final run.
+- 84 tests passed locally on Windows / Node 24.11.1; zero failures and skips in the final run.
 - Project batches: two loopback sites, a failed 404 target, deterministic order, 1–4 workers, strict config and bounded file reading, cancellation and actual navigation timeout.
 - Reports: HTML keyboard expand/collapse checked in real Chromium; report fixture passed axe with no automated violations. This does not replace manual assistive-technology review. CSV formula-prefix neutralization and quoting tested; ES offline guidance checked through the CLI.
 - Baselines: real CLI snapshot comparison, plus new/persistent/resolved identities; failed/cancelled pages, engine changes, redirect changes and added/removed scope do not produce false resolutions. DOM selector changes remain a documented limitation.
@@ -48,3 +48,5 @@ Remote branch: develop/phase-1-foundation. The Git credential helper could not r
 Initial remote Actions run: https://github.com/eligeunaweb/accesspilot-ai/actions/runs/40340593548 . macOS Node 22/24 passed when first inspected; other jobs were still running. Final branch status must be checked separately after the hash-route correction; local passing tests do not imply remote completion.
 
 Remaining product work is explicit in ARCHITECTURE.md: secured egress/crawling, full rule guidance/localization, historical storage/redaction, local UI/API, journeys/manual evidence, scheduling/plugins, full platform installation and release acceptance. The project is not finished or ready for a stable release.
+
+Final report regression: unknown severity uses its own translated label; 84 local tests passed after this correction. Remote checks for that exact commit remain independent.
