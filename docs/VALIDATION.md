@@ -257,3 +257,18 @@ Local execution uses the documented test-only outer-sandbox adapter, workspace b
 - Not tested or claimed: production accounts, external SSO/MFA, renewal, IndexedDB/sessionStorage, click journeys, full secret redaction, OS network containment or manual assistive-technology review. Page content/URLs/selectors can contain sensitive data even though runtime state is not persisted as configuration.
 
 203 pruebas aprobadas. La importación de sesiones no completa la fase de recorridos interactivos. Los perfiles públicos son contratos del operador, no pruebas criptográficas de identidad. No se han realizado fusiones, releases ni despliegues.
+
+
+## Interactive checkpoints / Puntos de recorrido — 2026-10-26
+
+- Final full suite: 208 passed, zero failures, cancellations or skips, 29.630 seconds on Windows / Node 24.11.1. Transcript: tests-journeys-verified.txt in task outputs.
+- Five new tests cover strict bounded steps/keys/markers, cancellation, sanitized step diagnostics, stable order/shared concurrency, mismatched evidence, URL/viewport/checkpoint identity, changed definitions, imports/exports and bilingual detail rendering.
+- Controlled real Chromium verifies initial/open/Escape-closed dialog states: button-name is detected only while open. Checks include missing markers, rejected POST before server receipt, saved authenticated state, loss of access during a journey, CLI CSV, history comparison and viewer labels. Existing keyboard/mobile/ES/EN viewer axe checks remain passing.
+- Repeated complete suite after adding the access-loss case; both complete executions passed. No dependencies added. git diff --check passed.
+- Six native CI jobs passed for preceding session head ea07554 (Windows/Linux/macOS x Node 22/24): https://github.com/eligeunaweb/accesspilot-ai/actions/runs/40386134723 . New journey-head native CI remains pending and must not inherit that result.
+- Local Chromium runs use the documented test-only outer-sandbox adapter and workspace browser/temp paths. They do not validate the native Chromium sandbox.
+- External acceptance not executed: real customer sites/accounts, SSO/MFA/login submission, POST-dependent flows, renewal, manual keyboard reachability/focus/screen-reader review, independent security and OS network containment. Explicit journey batches have per-page timeouts and shared concurrency, not a separate global deadline. Server-side mutations are not rolled back.
+
+208 pruebas aprobadas. Los puntos reproducen sus pasos desde un contexto nuevo y no comparten mutaciones entre puntos; las sesiones son opcionales. Las teclas dirigidas a un selector no prueban accesibilidad completa por teclado. No se han fusionado cambios ni publicado releases o despliegues.
+
+Current npm audit --json: zero known vulnerabilities; transcript npm-audit-journeys.json in task outputs.

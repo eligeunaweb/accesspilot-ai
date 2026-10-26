@@ -2,7 +2,7 @@
 
 ## Español
 
-Esta fase permite auditar páginas privadas con una sesión existente. No ejecuta formularios de login ni recorridos con clics. Cada página y viewport recibe una copia nueva de cookies y localStorage; los cambios no se guardan ni se comparten entre páginas. No se añaden dependencias.
+Esta fase permite auditar páginas privadas con una sesión existente. No ejecuta formularios de login. Los puntos con clics/teclado se configuran mediante [recorridos interactivos](INTERACTIVE-JOURNEYS.md). Cada página y viewport recibe una copia nueva de cookies y localStorage; los cambios no se guardan ni se comparten entre páginas. No se añaden dependencias.
 
 Configuración pública:
 
@@ -39,7 +39,7 @@ Los informes y el historial conservan la etiqueta pública y el selector de acce
 
 Cambiar de perfil o selector invalida comparaciones. Un perfil representa un contrato mantenido por el operador, no un hash de los secretos: cambiar de cuenta, permisos, conjunto de datos o estado funcional requiere cambiar la etiqueta. Comparar dos sesiones con la misma etiqueta no demuestra que sean equivalentes.
 
-Validación real disponible: fixture local con cookies y localStorage, aislamiento entre páginas, pérdida de acceso, bloqueo de salida a otro origen y CLI/historial. Pendientes: cuentas reales, SSO/MFA, renovación, flujos con clics, redacción avanzada, revisión de seguridad independiente y tecnologías de asistencia.
+Validación real disponible: fixture local con cookies y localStorage, aislamiento entre páginas, pérdida de acceso, bloqueo de salida a otro origen y CLI/historial. Pendientes: cuentas reales, SSO/MFA, renovación, formularios de login, redacción avanzada, revisión de seguridad independiente y tecnologías de asistencia.
 
 ## English
 
@@ -50,7 +50,7 @@ npx playwright codegen --save-storage=.accesspilot-auth/member.json https://exam
 node src/cli.js --project project.json --session-state .accesspilot-auth/member.json --history .accesspilot-history --format json
 ```
 
-Create the ignored `.accesspilot-auth` directory first. Sign in with an authorized test account and close the codegen browser to save state. Protect this file with OS user permissions; never commit it or share it. Windows ACLs are not changed automatically. Capture, encryption, renewal and interactive login journeys are not implemented.
+Create the ignored `.accesspilot-auth` directory first. Sign in with an authorized test account and close the codegen browser to save state. Protect this file with OS user permissions; never commit it or share it. Windows ACLs are not changed automatically. Capture, encryption, renewal and interactive login journeys are not implemented. Click/key checkpoints can reuse state; see [Interactive journeys](INTERACTIVE-JOURNEYS.md).
 
 Use the public project configuration above. `authentication.profile` is a public lowercase identifier (1–32 characters); `readySelector` must uniquely identify visible authorized content on every target, within five seconds or the remaining audit deadline. Neither field may contain credentials or personal identifiers. A missing marker fails the page rather than auditing a login screen. The marker is operator-specified evidence, not server-side identity verification.
 
@@ -62,6 +62,6 @@ Public labels/markers are retained in reports and history; runtime cookie/localS
 
 Changing the profile or marker makes baselines incomparable. Labels are operator-maintained contracts: change them when accounts, permissions, data or workflow state change. Reusing a label does not establish equivalent identities.
 
-Implemented acceptance fixtures cover authenticated cookies/localStorage, fresh-state isolation, expired access, blocked foreign egress, CLI and history. Real accounts, SSO/MFA, renewal, click journeys, advanced redaction, independent security review and assistive-technology testing remain pending.
+Implemented acceptance fixtures cover authenticated cookies/localStorage, fresh-state isolation, expired access, blocked foreign egress, CLI and history. Real accounts, SSO/MFA, renewal, login submission, advanced redaction, independent security review and assistive-technology testing remain pending.
 
 References: [Playwright authentication](https://playwright.dev/docs/auth), [BrowserContext storageState](https://playwright.dev/docs/api/class-browsercontext#browser-context-storage-state).

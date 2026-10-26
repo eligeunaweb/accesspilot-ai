@@ -222,3 +222,5 @@ See [history documentation / documentación del historial](docs/HISTORY.md) for
 privacy, storage guarantees and remaining limitations.
 
 Authenticated sessions / Sesiones autenticadas: [guide](docs/AUTHENTICATED-SESSIONS.md).
+
+Interactive journeys / Recorridos interactivos: [guide](docs/INTERACTIVE-JOURNEYS.md).
