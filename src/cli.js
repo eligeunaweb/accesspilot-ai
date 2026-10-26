@@ -10,9 +10,10 @@ import { auditProject, projectExitCode } from './runner.js';
 import { renderProject } from './project-report.js';
 import { compareAudits, loadSnapshot } from './comparison.js';
 import { messages } from './i18n.js';
+import { saveHistory, latestHistory, listHistory } from './history.js';
 
 function usage() {
-  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--baseline prior.json] [--output filename] [--fail-on-violations]');
+  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--baseline prior.json|latest] [--history directory] [--list-history] [--output filename] [--fail-on-violations]');
 }
 export async function main(args=process.argv.slice(2)) {
   let opts;
@@ -25,9 +26,11 @@ export async function main(args=process.argv.slice(2)) {
     if (opts.project) {
       const project = await loadProject(opts.project);
       if (opts.lang) project.language = opts.lang;
-      const baseline = opts.baseline ? await loadSnapshot(opts.baseline) : null;
+      if (opts.listHistory) { console.log(JSON.stringify(await listHistory(opts.history, project), null, 2)); return 0; }
+      const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const run = await auditProject(project, {signal:controller.signal});
       if (baseline) run.comparison = compareAudits(baseline, run);
+      if (opts.history) { const id = await saveHistory(opts.history, run); console.error(`History saved: ${id}`); }
       const output = renderProject(run, opts.format);
       if(opts.output) { await writeFile(opts.output, output, 'utf8'); console.log(`Report written to ${opts.output}`); }
       else console.log(output);

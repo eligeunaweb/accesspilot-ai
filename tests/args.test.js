@@ -7,3 +7,7 @@ for (const args of [[], ['https://u:p@example.org'], ['https://example.org','htt
 test('preserve output paths with spaces',()=>assert.equal(parse(['https://example.org','--output','my report.html']).output,'my report.html'));
 
 test('baseline requires an explicit project',()=>assert.throws(()=>parse(['https://example.org','--baseline','before.json']),/requires --project/));
+test('history options require an explicit project and store',()=>{
+  for(const args of [['https://example.org','--history','store'],['--project','p.json','--baseline','latest'],['--project','p.json','--list-history']]) assert.throws(()=>parse(args));
+  assert.equal(parse(['--project','p.json','--history','my store','--baseline','latest']).history,'my store');
+});

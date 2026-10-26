@@ -73,6 +73,17 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
       assert.ok(compared.totals.persistent>=4);
     } finally {await new Promise(resolve=>second.close(resolve));}
   });
+  await t.test('project history persists across CLI processes and compares latest',async()=>{
+    const config=join(dir,'history-project.json'), history=join(dir,'history store');
+    await writeFile(config,JSON.stringify({schemaVersion:1,name:'History E2E',urls:[url]}));
+    const args=['--project',config,'--history',history,'--baseline','latest','--format','json'];
+    const first=await run(args);assert.equal(first.code,0,first.err);
+    assert.equal(JSON.parse(first.out).comparison,undefined);
+    const next=await run(args);assert.equal(next.code,0,next.err);
+    assert.ok(JSON.parse(next.out).comparison.totals.persistent>=2);
+    const listed=await run(['--project',config,'--history',history,'--list-history']);
+    assert.equal(listed.code,0,listed.err);assert.equal(JSON.parse(listed.out).length,2);
+  });
   await t.test('real navigation timeout returns a failed audit',async()=>{
     await assert.rejects(auditPage(url+'/slow',{timeoutMs:1000}),/timed out|Timeout/);
   });
