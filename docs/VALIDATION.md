@@ -243,3 +243,17 @@ The preceding run exposed a fractional-timer boundary: a second profile could st
 Local execution uses the documented test-only outer-sandbox adapter, workspace browser cache and temporary directory. This does not validate native Chromium sandbox behavior. Native Windows/Linux/macOS CI for this new revision remains pending; six jobs passed for the preceding 9585be0 revision. No device, touch, zoom or screen-reader emulation is claimed. No dependencies added. No merge, release or deployment performed.
 
 197 pruebas aprobadas, sin fallos ni omisiones. Los perfiles cambian el viewport CSS; no sustituyen la revisión manual con tecnologías de asistencia. La validación nativa multiplataforma de esta revisión sigue pendiente.
+
+
+## Authenticated sessions / Sesiones autenticadas — 2026-10-26
+
+- Full suite: 203 passed, zero failures, cancellations or skips; 28.353 seconds, Windows / Node 24.11.1. Transcript: tests-sessions-verified.txt in task outputs.
+- Six additional tests cover strict single-origin HTTPS configuration, runtime state limits/scope/expiry, CLI audit-only flags, generic file diagnostics, per-target copies, public metadata, safe history comparisons and exports.
+- Real Chromium fixture checks cookies plus localStorage, fresh state across two pages despite mutations, missing access after invalid credentials, blocked foreign-origin fetch, CLI JSON/history and an unchanged source session file.
+- A full run exposed missing context in clean authenticated CSV rows (header only); status rows now preserve the public profile. The full suite passed after correction.
+- npm audit --json: zero known vulnerabilities; no dependencies added. git diff --check passed.
+- The preceding responsive head a53fae0 passed all six native Windows/Linux/macOS x Node 22/24 jobs: https://github.com/eligeunaweb/accesspilot-ai/actions/runs/40381926112 . This result is specific to that head. Native CI for the new session revision remains pending.
+- Local browser execution still uses the documented test-only outer-sandbox adapter and workspace cache/temp settings. It does not verify the native Chromium sandbox.
+- Not tested or claimed: production accounts, external SSO/MFA, renewal, IndexedDB/sessionStorage, click journeys, full secret redaction, OS network containment or manual assistive-technology review. Page content/URLs/selectors can contain sensitive data even though runtime state is not persisted as configuration.
+
+203 pruebas aprobadas. La importación de sesiones no completa la fase de recorridos interactivos. Los perfiles públicos son contratos del operador, no pruebas criptográficas de identidad. No se han realizado fusiones, releases ni despliegues.

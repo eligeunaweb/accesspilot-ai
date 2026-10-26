@@ -220,3 +220,5 @@ Preview count-based retention with `--prune-history --keep-runs 30`; add
 `--apply-retention` to apply it. Maintenance never launches the browser.
 See [history documentation / documentación del historial](docs/HISTORY.md) for
 privacy, storage guarantees and remaining limitations.
+
+Authenticated sessions / Sesiones autenticadas: [guide](docs/AUTHENTICATED-SESSIONS.md).
