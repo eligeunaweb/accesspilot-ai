@@ -161,3 +161,31 @@ Native matrix results after that setup change must be checked on the new commit.
   Audit execution from the web is intentionally outside this phase and still needs
   OS/network service isolation. See HISTORY-VIEWER.md for boundaries and UI limits.
 
+# Multi-project dashboard and filters / Panel multiproyecto — 2026-10-26
+
+- Full local suite: **175 passed, 0 failed, 0 skipped**, 26.48 seconds,
+  Windows / Node 24.11.1. No dependencies added.
+- Same documented host command: `node --import ./tests/helpers/outer-sandbox.js --test`,
+  ACCESSPILOT_TEST_OUTER_SANDBOX=1, workspace browser cache and writable TEMP/TMP.
+  Local network permission was granted. Native CI of this new head remains pending;
+  the test-only adapter does not establish production sandbox support in this host.
+- Validated 1–20 inline projects, normalized unique names, unknown fields, BOM,
+  1 MiB loading and strict CLI workspace/viewer mode. Shared configuration reader
+  preserves existing single-project validation and legacy CLI behavior.
+- HTTP/CLI fixtures: explicit workspace startup, unknown-project exclusion,
+  cross-project run/comparison rejection, isolated unavailable history cards,
+  project name/URL search, real leap-day validation, inclusive UTC ranges,
+  filtered pagination, empty matches and global latest-run baseline links.
+- Real Chromium/axe: dashboard ES/EN, mobile single-column cards without overflow,
+  keyboard project navigation, native filter submission/reset and empty-state
+  accessibility, in addition to existing single-project viewer browser checks.
+- Visual QA: desktop and 375 px mobile screenshots generated from explicitly
+  synthetic local histories, without scanning websites. Mobile card readability
+  was improved after inspecting screenshots, then the full suite was rerun.
+- Initial test-fixture scope/URL errors were corrected; the product validator
+  correctly rejected them. Long-name mobile overflow was fixed, not skipped.
+- Not validated: manual screen readers/users, large-history resource benchmarks,
+  content/status/severity filters, trend analytics, isolated job execution or
+  multiuser authorization. Counts represent recognized filenames, not validated
+  compliance results. See WORKSPACES.md for configuration and security boundaries.
+

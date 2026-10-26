@@ -52,7 +52,9 @@ exportación, errores, paginación, cierre, idiomas, teclado, formularios, expan
 de detalles, contenido malicioso escapado y viewport de 375 px. La revisión manual
 con lectores de pantalla y usuarios sigue pendiente.
 
-Pendientes: varios proyectos en un panel, búsqueda/filtros avanzados, tendencias,
+El panel de varios proyectos y los filtros por fecha/identificador están disponibles
+mediante `--workspace`; véase [WORKSPACES.md](WORKSPACES.md).
+Pendientes: búsqueda/filtros por contenido/estado/gravedad, tendencias,
 historial enriquecido con informes completos y ejecución segura desde la web.
 
 ## English
@@ -88,6 +90,7 @@ No audit-job API or new OS egress containment is introduced; those gates remain 
 
 HTTP and real Chromium/axe tests cover access controls, pagination, export, errors,
 shutdown, ES/EN, keyboard/form interactions, details, escaped malicious content
-and a 375 px viewport. Manual screen-reader/user testing, multiple-project
-dashboards, advanced filters/search, trends, enriched history and safely isolated
+and a 375 px viewport. The multi-project dashboard and date/ID filters are now
+available through `--workspace`; see WORKSPACES.md. Manual screen-reader/user
+testing, content/status/severity filters, trends, enriched history and safely isolated
 web audit execution remain pending.

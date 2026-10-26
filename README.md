@@ -205,6 +205,9 @@ Use `--list-history` with the same project and history directory to list saved r
 Open the local read-only web viewer with `--serve-history` and the same project
 and history options. Open the session URL printed in the terminal; stop with Ctrl+C.
 See [viewer guide / guía del visor](docs/HISTORY-VIEWER.md).
+Use `--workspace examples/workspace.json --history .accesspilot-history --serve-history`
+for the multi-project dashboard. Search by project name/URL, then filter each
+history by UTC dates or run ID. See [workspaces / espacios de trabajo](docs/WORKSPACES.md).
 Preview count-based retention with `--prune-history --keep-runs 30`; add
 `--apply-retention` to apply it. Maintenance never launches the browser.
 See [history documentation / documentación del historial](docs/HISTORY.md) for
