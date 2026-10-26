@@ -1,0 +1,11 @@
+﻿node_modules/
+playwright-report/
+test-results/
+report.html
+report.json
+audit.html
+audit.json
+pagina-prueba.html
+*.bak
+*.log
+.env

@@ -1,0 +1,11 @@
+{
+  "name": "accesspilot-ai",
+  "version": "0.1.0",
+  "description": "Local accessibility audit CLI powered by Playwright and axe-core",
+  "type": "module",
+  "bin": {"accesspilot": "./src/cli.js"},
+  "scripts": {"test": "node --test", "audit": "node src/cli.js"},
+  "engines": {"node": ">=20"},
+  "dependencies": {"@axe-core/playwright": "^4.10.2", "playwright": "^1.58.0"},
+  "license": "MIT"
+}
