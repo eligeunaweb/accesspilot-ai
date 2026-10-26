@@ -64,6 +64,12 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
       assert.equal(r.code,2,r.err);const data=JSON.parse(r.out);
       assert.equal(data.totals.succeeded,2);assert.equal(data.totals.failed,1);
       assert.match(data.pages[2].error,/404/);assert.ok(data.totals.affectedElements>=4);
+      const baseline=join(dir,'baseline.json');await writeFile(baseline,r.out);
+      const next=await run(['--project',config,'--format','json','--baseline',baseline]);
+      assert.equal(next.code,2,next.err);const compared=JSON.parse(next.out).comparison;
+      assert.equal(compared.totals.comparablePages,2);assert.equal(compared.totals.incomparablePages,1);
+      assert.equal(compared.totals.added,0);assert.equal(compared.totals.resolved,0);
+      assert.ok(compared.totals.persistent>=4);
     } finally {await new Promise(resolve=>second.close(resolve));}
   });
   await t.test('real navigation timeout returns a failed audit',async()=>{

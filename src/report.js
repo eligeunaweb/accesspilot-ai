@@ -54,6 +54,7 @@ function renderFinding(rule, lang) {
   return `<details><summary>${escapeHtml(rule.id)} — ${escapeHtml(rule.help)}</summary><p>${escapeHtml(rule.description ?? '')}</p><p>${escapeHtml(t.criterion)}: ${escapeHtml(criteria.join(', ') || t.unknown)}</p><h4>${t.fix}</h4><p>${escapeHtml(advice.correction)}</p><h4>${t.verify}</h4><p>${escapeHtml(advice.verification)}</p>${link?`<p><a href="${escapeHtml(link)}" rel="noreferrer noopener">${escapeHtml(rule.id)} — ${t.details}</a></p>`:''}<div class="scroll" role="region" aria-label="${escapeHtml(rule.id)} ${t.details}" tabindex="0"><table><caption>${escapeHtml(rule.id)} — ${t.details}</caption><thead><tr><th scope="col">${t.element}</th><th scope="col">${t.details}</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
 }
 export function pageReportBody(report, prefix = 'page') {
+  prefix=String(prefix).replace(/[^a-zA-Z0-9_-]/g,'') || 'page';
   const lang=languageCode(report.language);const t=messages[lang];
   const groups=['critical','serious','moderate','minor','unknown'];
   const sections=groups.map(impact=>{
@@ -62,7 +63,7 @@ export function pageReportBody(report, prefix = 'page') {
   }).join('');
   const nav=groups.filter(impact=>report.violations.some(rule=>(groups.includes(rule.impact)?rule.impact:'unknown')===impact))
     .map(impact=>`<li><a href="#${prefix}-${impact}">${t[impact] ?? t.other}</a></li>`).join('');
-  return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p><p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${report.passes}; ${t.review}: ${report.incomplete}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${report.incomplete})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
+  return `<p><strong>URL:</strong> ${escapeHtml(report.url)}</p><p class="metrics">${t.rules}: ${report.violations.length}; ${t.passed}: ${escapeHtml(report.passes)}; ${t.review}: ${escapeHtml(report.incomplete)}</p><p>${escapeHtml(report.disclaimer)}</p><h2>${t.findings}</h2>${nav?`<nav aria-label="${t.severity}"><ul>${nav}</ul></nav>`:''}${sections || `<p>${t.none}</p>`}<section><h2>${t.review} (${escapeHtml(report.incomplete)})</h2>${(report.incompleteDetails ?? []).map(rule=>renderFinding(rule,lang)).join('')}</section>`;
 }
 export function htmlDocument(title, language, body) {
   const lang=languageCode(language);

@@ -5,3 +5,5 @@ for (const args of [[], ['https://u:p@example.org'], ['https://example.org','htt
   test(`reject invalid arguments: ${args.join(' ') || '(empty)'}`,()=>assert.throws(()=>parse(args)));
 }
 test('preserve output paths with spaces',()=>assert.equal(parse(['https://example.org','--output','my report.html']).output,'my report.html'));
+
+test('baseline requires an explicit project',()=>assert.throws(()=>parse(['https://example.org','--baseline','before.json']),/requires --project/));

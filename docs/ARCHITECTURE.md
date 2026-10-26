@@ -16,7 +16,7 @@ Threat model: scanned pages and imported files are untrusted; local operator and
 | B1 | Project JSON + explicit multi-site batches | Unknown keys/types/limits rejected; duplicate normalized URLs removed; bounded concurrency; deterministic order; partial failures; cancellation; real CLI fixture | 55 local tests passed (includes legacy); remote pending |
 | B2 | Scoped crawler and network boundary | Page/depth/origin/redirect/resource limits, adversarial egress fixtures, DNS rebinding + timeout/cancellation tests | Pending |
 | C | Reports and evidence | Versioned JSON, safe CSV, accessible interactive HTML, severity/WCAG indices, full incomplete evidence, ES/EN curated fixes; round-trip/security/browser tests | Implemented subset: eight curated rules; full rule translation/manual user testing pending |
-| D | History/compare | Atomic writes, migrations, retention/redaction, baseline scope/engine mismatch detection, no false resolutions for failed pages | Pending |
+| D | History/compare | Atomic writes, migrations, retention/redaction, baseline scope/engine mismatch detection, no false resolutions for failed pages | Baseline comparison implemented; automatic history, migrations and redaction pending |
 | E | Local UI/API | Accessible dashboard on loopback; auth/CSRF/SSRF fixtures; API schema and integrations | Pending |
 | F | Workflow depth | Viewports/journeys, manual evidence, scheduler recovery, report plugins and regression gates; security review | Pending |
 | G | Stable release preparation | Windows/Linux/macOS install/update/uninstall, CI green, resource benchmarks, user docs, manual accessibility, notices/SBOM and reproducible archives | Pending; publication needs user approval |

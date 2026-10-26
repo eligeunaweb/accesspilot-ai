@@ -8,10 +8,11 @@ import { parse } from './args.js';
 import { loadProject } from './project.js';
 import { auditProject, projectExitCode } from './runner.js';
 import { renderProject } from './project-report.js';
+import { compareAudits, loadSnapshot } from './comparison.js';
 import { messages } from './i18n.js';
 
 function usage() {
-  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--output filename] [--fail-on-violations]');
+  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--baseline prior.json] [--output filename] [--fail-on-violations]');
 }
 export async function main(args=process.argv.slice(2)) {
   let opts;
@@ -24,7 +25,9 @@ export async function main(args=process.argv.slice(2)) {
     if (opts.project) {
       const project = await loadProject(opts.project);
       if (opts.lang) project.language = opts.lang;
+      const baseline = opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const run = await auditProject(project, {signal:controller.signal});
+      if (baseline) run.comparison = compareAudits(baseline, run);
       const output = renderProject(run, opts.format);
       if(opts.output) { await writeFile(opts.output, output, 'utf8'); console.log(`Report written to ${opts.output}`); }
       else console.log(output);

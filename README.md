@@ -123,3 +123,27 @@ general identificada como tal. El texto original del motor se conserva sin
 traducir. Los incompletos conservan ahora su evidencia para revisión humana.
 CSV neutraliza prefijos de fórmulas, pero no sustituye la revisión de datos antes
 de compartirlos. No se afirma certificación WCAG ni cobertura manual completa.
+
+## Baselines / Comparación de auditorías
+
+```powershell
+node .\src\cli.js --project .\examples\project.json --format json --output before.json
+# After changing your website / Tras corregir la web:
+node .\src\cli.js --project .\examples\project.json --baseline before.json --format json --output after.json
+```
+
+The comparison tracks new, persistent and no-longer-observed automated findings
+by requested URL, rule and exact selector. Changed engine/version, final URL,
+failed/cancelled pages and added/removed scope are **incomparable**, never marked
+resolved. Selector changes can still change issue identity; manual checks and
+incomplete results are not resolved by this algorithm. JSON is the canonical
+comparison; text/HTML include it, CSV exports current findings only. Baselines
+are validated and limited to 20 MiB. Files are explicitly saved with `--output`;
+there is no automatic historical database, retention or scheduling yet.
+
+La comparación evita presentar páginas fallidas, retiradas o analizadas con otro
+motor como mejoras. Un cambio de selector puede cambiar la identidad de una
+incidencia. El historial automático y las revisiones manuales siguen pendientes.
+
+Development diagnostic: `node scripts/benchmark.js benchmark.json`. Wall time
+covers full audits; CPU/RSS measurements cover Node only, excluding Chromium.
