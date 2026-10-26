@@ -14,14 +14,16 @@ function target(value, depth = 0) {
 export function validateSnapshot(input) {
   if (!input || input.schemaVersion !== 1 || input.kind !== 'project-audit') throw new Error('Expected project-audit snapshot schemaVersion 1');
   const project=validateProject(input.project);
-  if (!Array.isArray(input.pages) || input.pages.length !== project.urls.length) throw new Error('Invalid snapshot page count');
+  if (!Array.isArray(input.pages) || (project.crawl ? input.pages.length<project.urls.length||input.pages.length>project.crawl.maxPages : input.pages.length!==project.urls.length)) throw new Error('Invalid snapshot page count');
   const seen=new Set();
   const pages=input.pages.map(page=>{
     const url=normalizeUrl(page.url);
-    if (seen.has(url) || !project.urls.includes(url)) throw new Error('Invalid snapshot page scope');
+    const inScope=project.crawl ? project.urls.some(seed=>new URL(seed).origin===new URL(url).origin) : project.urls.includes(url);
+    if(project.crawl&&(!Number.isInteger(page.depth)||page.depth<0||page.depth>project.crawl.maxDepth)) throw new Error('Invalid snapshot crawl depth');
+    if (seen.has(url) || !inScope) throw new Error('Invalid snapshot page scope');
     seen.add(url);
     if (!['succeeded','failed','cancelled'].includes(page.status)) throw new Error('Invalid snapshot page status');
-    if (page.status !== 'succeeded') return {url,status:page.status};
+    if (page.status !== 'succeeded') return {url,status:page.status,...(project.crawl?{depth:page.depth}:{})};
     const report=page.report;
     if (!report || report.schemaVersion !== 1 || report.kind !== 'page-audit') throw new Error('Invalid snapshot page report');
     const finalUrl=normalizeUrl(report.url);
@@ -33,8 +35,14 @@ export function validateSnapshot(input) {
       if (!Array.isArray(rule.nodes) || rule.nodes.length > 10000) throw new Error('Invalid snapshot nodes');
       return {id,nodes:rule.nodes.map(node=>({target:target(node.target)}))};
     });
-    return {url,status:'succeeded',report:{schemaVersion:1,kind:'page-audit',url:finalUrl,engine,violations}};
+    let network=null;
+    if(report.network) {
+      if(!Number.isInteger(report.network.policyVersion)||report.network.policyVersion<1) throw new Error('Invalid snapshot network policy version');
+      network={policyVersion:report.network.policyVersion};
+    }
+    return {url,status:'succeeded',...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,engine,network,violations}};
   });
+  for(const seed of project.urls) if(!seen.has(seed)) throw new Error('Snapshot omits a configured seed');
   return {schemaVersion:1,kind:'project-audit',project,pages};
 }
 export async function loadSnapshot(path) {
@@ -62,6 +70,7 @@ function findings(page) {
 }
 export function compareAudits(beforeInput, afterInput) {
   const before=validateSnapshot(beforeInput), after=validateSnapshot(afterInput);
+  const fingerprint=project=>JSON.stringify([project.crawl ?? null,project.network ?? null,project.network ? [...new Set(project.urls.map(url=>new URL(url).origin))].sort() : null]);
   const oldPages=new Map(before.pages.map(page=>[page.url,page]));
   const newPages=new Map(after.pages.map(page=>[page.url,page]));
   const urls=[...new Set([...oldPages.keys(),...newPages.keys()])].sort();
@@ -69,9 +78,12 @@ export function compareAudits(beforeInput, afterInput) {
   const pages=urls.map(url=>{
     const oldPage=oldPages.get(url),newPage=newPages.get(url);
     let reason;
-    if (!oldPage || !newPage) reason='scope-changed';
+    if(fingerprint(before.project)!==fingerprint(after.project)) reason='policy-changed';
+    else if (!oldPage || !newPage) reason='scope-changed';
     else if (oldPage.status !== 'succeeded' || newPage.status !== 'succeeded') reason='page-not-audited';
     else if (oldPage.report.url !== newPage.report.url) reason='destination-changed';
+    else if(before.project.network&&(!oldPage.report.network||!newPage.report.network)) reason='network-policy-unknown';
+    else if(before.project.network&&oldPage.report.network.policyVersion!==newPage.report.network.policyVersion) reason='network-policy-changed';
     else if (!oldPage.report.engine || !newPage.report.engine) reason='engine-unknown';
     else if (JSON.stringify(oldPage.report.engine) !== JSON.stringify(newPage.report.engine)) reason='engine-changed';
     if (reason) {totals.incomparablePages++;return {url,status:'incomparable',reason};}

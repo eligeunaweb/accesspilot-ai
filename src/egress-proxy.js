@@ -8,10 +8,10 @@ function headers(input) {
   const connectionTokens=String(input.connection ?? '').toLowerCase().split(',').map(s=>s.trim());
   return Object.fromEntries(Object.entries(input).filter(([key])=>!hopHeaders.has(key.toLowerCase())&&!connectionTokens.includes(key.toLowerCase())));
 }
-export async function startEgressProxy(policy, {maxBytes=16*1024*1024, timeoutMs=10000, lookup} = {}) {
+export async function startEgressProxy(policy, {maxBytes=16*1024*1024, timeoutMs=10000, maxRedirects=5, maxConnections=64, lookup} = {}) {
   const username='accesspilot',password=randomBytes(32).toString('hex');
   const expected=Buffer.from('Basic '+Buffer.from(username+':'+password).toString('base64'));
-  const sockets=new Set(),failures=[];let bytes=0,closing=false,closePromise;
+  const sockets=new Set(),failures=[];let bytes=0,redirects=0,closing=false,closePromise;
   const record=reason=>{if(!closing&&failures.length<20) failures.push(reason);};
   const authorize=req=>{
     const supplied=Buffer.from(String(req.headers['proxy-authorization'] ?? ''));
@@ -36,14 +36,21 @@ export async function startEgressProxy(policy, {maxBytes=16*1024*1024, timeoutMs
     const forwarded=headers(req.headers);forwarded.host=target.url.host;delete forwarded['content-length'];
     const outgoing=http.request({host:target.address,port:target.port,family:target.family,method:req.method,
       path:target.url.pathname+target.url.search,headers:forwarded,agent:false},response=>{
+      if(response.statusCode>=300&&response.statusCode<400&&response.headers.location) {
+        try {
+          if(++redirects>maxRedirects) throw new Error('Redirect budget exceeded');
+          policy.check(new URL(response.headers.location,target.url).href,req.headers['sec-fetch-mode']==='navigate');
+        } catch(error) {record(error.message);response.destroy();reply(res,403,'Redirect denied');return;}
+      }
       res.writeHead(response.statusCode,headers(response.headers));
-      response.on('data',budget);response.on('error',()=>res.destroy());response.pipe(res);
+      response.on('data',budget);response.on('error',()=>{record('Upstream response failed');res.destroy();});response.pipe(res);
     });
     outgoing.on('socket',track);outgoing.setTimeout(timeoutMs,()=>outgoing.destroy(new Error('Upstream timeout')));
     outgoing.on('error',()=>{record('Upstream HTTP request failed');reply(res,502,'Upstream failed');});
     res.on('close',()=>outgoing.destroy());outgoing.end();
   });
-  server.maxConnections=64;
+  server.maxConnections=maxConnections;
+  server.on('drop',()=>record('Connection budget exceeded'));
   server.on('connection',socket=>{track(socket);socket.setTimeout(timeoutMs,()=>socket.destroy());});
   server.on('clientError',(_,socket)=>socket.destroy());
   server.on('upgrade',(_,socket)=>{record('Protocol upgrades are blocked');socket.destroy();});

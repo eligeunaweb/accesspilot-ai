@@ -11,7 +11,7 @@ import { auditPage } from '../src/audit.js';
 const cli = fileURLToPath(new URL('../src/cli.js', import.meta.url));
 function run(args, script = cli) {
   return new Promise((resolve,reject) => {
-    const child=spawn(process.execPath,[script,...args], {windowsHide:true});
+    const child=spawn(process.execPath,['--import',new URL('./helpers/outer-sandbox.js',import.meta.url).href,script,...args], {windowsHide:true});
     let out='', err='';
     child.stdout.on('data',d=>out+=d); child.stderr.on('data',d=>err+=d);
     child.on('error',reject); child.on('close',code=>resolve({code,out,err}));
@@ -84,6 +84,26 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
   await t.test('Spanish CSV CLI contains curated fixes',async()=>{
     const r=await run([url,'--format','csv','--lang','es']);
     assert.equal(r.code,0,r.err);assert.match(r.out,/"image-alt"/);assert.match(r.out,/texto alternativo/);
+  });
+  await t.test('restricted crawler CLI discovers pages, preserves depth and compares its snapshot',async()=>{
+    const graph={'/':['/a','/b','/logout','https://outside.invalid/'],'/a':['/c'],'/b':['/c'],'/c':[]};
+    const visited=[];
+    const site=createServer((req,res)=>{
+      visited.push(req.url);res.setHeader('Content-Type','text/html; charset=utf-8');
+      res.end(`<!doctype html><html lang="en"><head><title>Crawl</title></head><body><main><h1>Crawl</h1><button></button>${(graph[req.url]??[]).map(href=>`<a href="${href}">Next</a>`).join('')}</main></body></html>`);
+    });
+    await new Promise(resolve=>site.listen(0,'127.0.0.1',resolve));
+    try {
+      const origin=`http://127.0.0.1:${site.address().port}`;
+      const config=join(dir,'crawl.json');await writeFile(config,JSON.stringify({schemaVersion:1,name:'Restricted crawler',urls:[origin],concurrency:2,crawl:{maxPages:10,maxDepth:2},network:{allowPrivateOrigins:[origin]}}));
+      const r=await run(['--project',config,'--format','json']);assert.equal(r.code,0,r.err);
+      const data=JSON.parse(r.out);assert.equal(data.crawl.completeWithinScope,true);
+      assert.deepEqual(data.pages.map(page=>new URL(page.url).pathname),['/','/a','/b','/c']);
+      assert.deepEqual(data.pages.map(page=>page.depth),[0,1,1,2]);assert.ok(!visited.includes('/logout'));
+      const baseline=join(dir,'crawl-before.json');await writeFile(baseline,r.out);
+      const compared=await run(['--project',config,'--baseline',baseline,'--format','json']);assert.equal(compared.code,0,compared.err);
+      assert.equal(JSON.parse(compared.out).comparison.totals.comparablePages,4);
+    } finally {await new Promise(resolve=>site.close(resolve));}
   });
   await t.test('entrypoint supports spaces, percent and hash',async()=>{
     const script=fileURLToPath(new URL('../src/entry # % test.js',import.meta.url));
