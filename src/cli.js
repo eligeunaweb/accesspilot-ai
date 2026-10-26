@@ -3,14 +3,15 @@ import { auditPage } from './audit.js';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { htmlReport } from './report.js';
+import { htmlReport, csvReport } from './report.js';
 import { parse } from './args.js';
 import { loadProject } from './project.js';
 import { auditProject, projectExitCode } from './runner.js';
 import { renderProject } from './project-report.js';
+import { messages } from './i18n.js';
 
 function usage() {
-  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html] [--output filename] [--fail-on-violations]');
+  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--output filename] [--fail-on-violations]');
 }
 export async function main(args=process.argv.slice(2)) {
   let opts;
@@ -22,17 +23,18 @@ export async function main(args=process.argv.slice(2)) {
   try {
     if (opts.project) {
       const project = await loadProject(opts.project);
+      if (opts.lang) project.language = opts.lang;
       const run = await auditProject(project, {signal:controller.signal});
       const output = renderProject(run, opts.format);
       if(opts.output) { await writeFile(opts.output, output, 'utf8'); console.log(`Report written to ${opts.output}`); }
       else console.log(output);
       return projectExitCode(run, opts.fail);
     }
-    const report=await auditPage(opts.url, {signal:controller.signal});
-    const output=opts.format==='json'?JSON.stringify(report,null,2):opts.format==='html'?htmlReport(report):[
+    const report=await auditPage(opts.url, {signal:controller.signal, language:opts.lang});
+    const output=opts.format==='json'?JSON.stringify(report,null,2):opts.format==='html'?htmlReport(report):opts.format==='csv'?csvReport(report):[
       `AccessPilot AI v0.1.0 | ${report.url}`,
-      `${report.violations.length} violated rules; ${report.incomplete} checks need review`,
-      ...report.violations.map(v=>`${v.impact.toUpperCase()} ${v.id}: ${v.help} (${v.nodes.length} elements)`),
+      `${report.violations.length} ${messages[report.language].rules.toLowerCase()}; ${report.incomplete} ${messages[report.language].review.toLowerCase()}`,
+      ...report.violations.map(v=>`${v.impact.toUpperCase()} ${v.id}: ${v.help} (${v.nodes.length} elements)\n${v.recommendation.correction}\n${v.recommendation.verification}`),
       report.disclaimer
     ].join('\n');
     if(opts.output) {await writeFile(opts.output,output,'utf8');console.log(`Report written to ${opts.output}`);}

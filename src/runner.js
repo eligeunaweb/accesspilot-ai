@@ -18,7 +18,7 @@ export async function auditProject(input, { audit = auditPage, signal } = {}) {
       }
       const pageStarted = performance.now();
       try {
-        const report = await audit(url, { signal, timeoutMs: project.timeoutMs });
+        const report = await audit(url, { signal, timeoutMs: project.timeoutMs, language:project.language });
         if (signal?.aborted) throw new Error('Audit cancelled');
         pages[index] = {url, status: 'succeeded', durationMs: Math.round(performance.now() - pageStarted), report};
       } catch (error) {

@@ -1,3 +1,4 @@
+import { languageCode } from './i18n.js';
 import { open } from 'node:fs/promises';
 
 export const MAX_CONFIG_BYTES = 1024 * 1024;
@@ -17,13 +18,13 @@ function integer(value, fallback, min, max, key) {
 }
 export function validateProject(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Project must be a JSON object');
-  const allowed = new Set(['schemaVersion', 'name', 'urls', 'concurrency', 'timeoutMs']);
+  const allowed = new Set(['schemaVersion', 'name', 'urls', 'concurrency', 'timeoutMs', 'language']);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`Unknown project property: ${key}`);
   if (input.schemaVersion !== 1) throw new Error('Project schemaVersion must be 1');
-  if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 120 || /[\x00-\x1f\x7f]/.test(input.name)) throw new Error('Project name must contain 1–120 printable characters');
-  if (!Array.isArray(input.urls) || input.urls.length < 1 || input.urls.length > 100) throw new Error('Project urls must contain 1–100 URLs');
+  if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 120 || /[\x00-\x1f\x7f]/.test(input.name)) throw new Error('Project name must contain 1â€“120 printable characters');
+  if (!Array.isArray(input.urls) || input.urls.length < 1 || input.urls.length > 100) throw new Error('Project urls must contain 1â€“100 URLs');
   return {
-    schemaVersion: 1, name: input.name.trim(),
+    schemaVersion: 1, name: input.name.trim(), language:languageCode(input.language),
     urls: [...new Set(input.urls.map(normalizeUrl))],
     concurrency: integer(input.concurrency, 1, 1, 4, 'concurrency'),
     timeoutMs: integer(input.timeoutMs, 30000, 1000, 120000, 'timeoutMs')

@@ -1,15 +1,17 @@
-import { escapeHtml, htmlReport } from './report.js';
+import { escapeHtml, htmlDocument, pageReportBody, csvHeaders, csvCell, findingRows } from './report.js';
+import { messages, languageCode } from './i18n.js';
 
 export function renderProject(run, format) {
   if (format === 'json') return JSON.stringify(run, null, 2);
-  const summary = `${run.project.name}: ${run.totals.succeeded} succeeded; ${run.totals.failed} failed; ${run.totals.cancelled} cancelled; ${run.totals.violatedRules} violated rules`;
-  if (format === 'text') return [summary, ...run.pages.map(page =>
-    `${page.status.toUpperCase()} ${page.url}: ${page.report ? `${page.report.violations.length} violated rules` : page.error}`),
-    'Automated checks do not establish WCAG conformance.'].join('\n');
+  const lang=languageCode(run.project.language);const t=messages[lang];
+  if (format === 'csv') {
+    const rows=run.pages.flatMap(page=>page.report ? findingRows(page.report) : [[page.status,page.url,'','','','',page.error,'','']]);
+    return [csvHeaders,...rows].map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n';
+  }
+  const summary=`${run.project.name}: ${run.totals.succeeded} ${t.succeeded}; ${run.totals.failed} ${t.failed}; ${run.totals.cancelled} ${t.cancelled}; ${run.totals.violatedRules} ${t.rules.toLowerCase()}`;
+  if (format === 'text') return [summary,...run.pages.map(page=>
+    `${page.status.toUpperCase()} ${page.url}: ${page.report ? `${page.report.violations.length} ${t.rules.toLowerCase()}` : page.error}`),t.disclaimer].join('\n');
   if (format !== 'html') throw new Error('Unsupported project report format');
-  // No scanned content is placed in an executable context.
-  const pages = run.pages.map(page => `<section><h2>${escapeHtml(page.url)}</h2><p>${escapeHtml(page.status)}</p>${page.report ?
-    `<iframe title="${escapeHtml(page.url)} findings" sandbox srcdoc="${escapeHtml(htmlReport(page.report))}" style="width:100%;height:30rem;border:1px solid #777"></iframe>` :
-    `<p>${escapeHtml(page.error)}</p>`}</section>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AccessPilot AI project report</title><style>body{font:1rem/1.6 system-ui;max-width:76rem;margin:auto;padding:1.5rem;overflow-wrap:anywhere}</style></head><body><main><h1>${escapeHtml(run.project.name)}</h1><p>${escapeHtml(summary)}</p>${pages}</main></body></html>`;
+  const pages=run.pages.map((page,index)=>`<section><h2>${escapeHtml(page.url)}</h2><p>${escapeHtml(t[page.status])}</p>${page.report ? pageReportBody(page.report,`page-${index}`) : `<p>${escapeHtml(page.error)}</p>`}</section>`).join('');
+  return htmlDocument(run.project.name,lang,`<p class="metrics">${escapeHtml(summary)}</p><p>${t.duration}: ${run.durationMs} ms</p>${pages}`);
 }

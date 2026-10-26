@@ -1,4 +1,4 @@
-# AccessPilot AI Ã°Å¸Â§Â­
+# AccessPilot AI 🧭
 
 Free, open-source **automated accessibility review CLI** built with Playwright and axe-core.
 
@@ -36,9 +36,9 @@ accesspilot <http(s) URL> [--format text|json|html] [--output filename] [--fail-
 
 Use `--fail-on-violations` in CI to return exit code 1 if axe reports any violations. Network/browser errors return 2. Reports include potentially sensitive page content and selectors; review them before sharing.
 
-## EspaÃƒÂ±ol
+## Español
 
-AccessPilot AI v0.1.0 analiza automÃƒÂ¡ticamente pÃƒÂ¡ginas web mediante Playwright y axe-core y genera informes de texto, JSON o HTML. **No garantiza el cumplimiento de WCAG**: hay que complementar el anÃƒÂ¡lisis con pruebas manuales de teclado, lectores de pantalla y experiencia de uso. No introduce cambios en la web auditada.
+AccessPilot AI v0.1.0 analiza automáticamente páginas web mediante Playwright y axe-core y genera informes de texto, JSON o HTML. **No garantiza el cumplimiento de WCAG**: hay que complementar el análisis con pruebas manuales de teclado, lectores de pantalla y experiencia de uso. No introduce cambios en la web auditada.
 
 ## Limitations
 
@@ -54,7 +54,7 @@ MIT.
 
 ## Development / Desarrollo
 
-See [audit and roadmap / auditorÃ­a y hoja de ruta](docs/AUDIT-ROADMAP.md).
+See [audit and roadmap / auditoría y hoja de ruta](docs/AUDIT-ROADMAP.md).
 Use Node.js 22.12 or newer. / Usa Node.js 22.12 o superior.
 
 ```powershell
@@ -64,8 +64,8 @@ npm test
 ```
 
 Tests include a real Chromium audit of a local HTTP fixture; no public target is required.
-Las pruebas incluyen una auditorÃ­a real con Chromium de un servidor local.
-HTTP errors return exit code 2. / Los errores HTTP devuelven cÃ³digo 2.
+Las pruebas incluyen una auditoría real con Chromium de un servidor local.
+HTTP errors return exit code 2. / Los errores HTTP devuelven código 2.
 `--output` overwrites the selected file. / `--output` sobrescribe el archivo indicado.
 
 ## Projects and batches / Proyectos y lotes
@@ -93,3 +93,33 @@ contra SSRF y el crawler pertenecen a B2; aún no están implementados.
 
 See [competitive comparison](docs/COMPETITIVE-ANALYSIS.md) and
 [architecture and acceptance gates](docs/ARCHITECTURE.md). Product development is ongoing.
+
+## Reports and language / Informes e idioma
+
+```powershell
+node .\src\cli.js https://example.com --lang es --format html --output informe.html
+node .\src\cli.js --project .\examples\project.json --lang en --format csv --output findings.csv
+```
+
+Project configuration also accepts `language: "es"` or `"en"`; `--lang` overrides it.
+JSON keeps the existing fields and adds schema/version metadata, engine version,
+WCAG criterion mappings, recommendations and `incompleteDetails`. The `incomplete`
+count remains compatible. WCAG mappings come only from the engine tags; no tag is
+not a pass. HTML groups findings by severity and uses native keyboard-operable
+expand/collapse controls, without scripts or external resources. CSV includes
+violations, manual-review findings and failed/cancelled project targets; cells are
+quoted and spreadsheet formula prefixes neutralized. A successful page with no
+findings contributes no CSV finding row; JSON is the complete run record.
+
+Spanish/English interface text and offline guidance are included. Eight common
+rules have curated correction and verification advice. Other rules explicitly use
+general guidance (`recommendation.kind: "general"`). Engine messages/evidence
+remain in the engine's language, usually English; this is not a full translation
+of axe. No LLM or paid service is needed. Confirm contextual advice manually.
+
+La interfaz de los informes y las recomendaciones están disponibles en español
+e inglés. Ocho reglas tienen orientación específica; las demás usan orientación
+general identificada como tal. El texto original del motor se conserva sin
+traducir. Los incompletos conservan ahora su evidencia para revisión humana.
+CSV neutraliza prefijos de fórmulas, pero no sustituye la revisión de datos antes
+de compartirlos. No se afirma certificación WCAG ni cobertura manual completa.

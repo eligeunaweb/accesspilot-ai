@@ -74,6 +74,10 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
     try {await assert.rejects(auditPage(url+'/slow',{signal:controller.signal}),/cancelled/);}
     finally {clearTimeout(timer);}
   });
+  await t.test('Spanish CSV CLI contains curated fixes',async()=>{
+    const r=await run([url,'--format','csv','--lang','es']);
+    assert.equal(r.code,0,r.err);assert.match(r.out,/"image-alt"/);assert.match(r.out,/texto alternativo/);
+  });
   await t.test('entrypoint supports spaces, percent and hash',async()=>{
     const script=fileURLToPath(new URL('../src/entry # % test.js',import.meta.url));
     try {await copyFile(cli,script);const r=await run(['--help'],script);assert.equal(r.code,0,r.err);assert.match(r.out,/Usage:/);}

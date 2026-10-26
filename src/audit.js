@@ -4,7 +4,7 @@ import { summarize } from './report.js';
 import { normalizeUrl } from './project.js';
 
 export async function auditPage(url, { launch = () => chromium.launch({headless:true, timeout:timeoutMs}),
-  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000 } = {}) {
+  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en' } = {}) {
   url = normalizeUrl(url);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) throw new Error('Invalid audit timeout');
   const controller = new AbortController();
@@ -29,7 +29,7 @@ export async function auditPage(url, { launch = () => chromium.launch({headless:
       const page = await context.newPage();
       const response = await page.goto(url, {waitUntil:'domcontentloaded', timeout:timeoutMs});
       if (!response || !response.ok()) throw new Error(`HTTP navigation failed: ${response?.status() ?? 'no response'}`);
-      return summarize(await analyze(page), page.url());
+      return summarize(await analyze(page), page.url(), {language});
     })()]);
   } catch (error) { failure = error; }
   finally {
