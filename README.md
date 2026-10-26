@@ -147,3 +147,53 @@ incidencia. El historial automático y las revisiones manuales siguen pendientes
 
 Development diagnostic: `node scripts/benchmark.js benchmark.json`. Wall time
 covers full audits; CPU/RSS measurements cover Node only, excluding Chromium.
+
+## Restricted crawling / Rastreo con controles de red
+
+```powershell
+node .\src\cli.js --project .\examples\crawl.json --format html --output crawl.html
+```
+
+Add `crawl: {}` to project JSON to enable bounded breadth-first discovery. Seeds
+and their HTTP(S) origins define navigation scope. Results retain depth and source
+URL; coverage metadata distinguishes excluded/out-of-scope links, duplicates,
+depth boundaries and truncated runs. Default depth is 2, page limit 20 (maximum
+100), total run deadline 120 seconds. Page/link/transfer/deadline truncation returns
+exit 2, even if completed pages have no violations. A configured depth boundary
+means only that declared depth was covered, never that the entire site was audited.
+
+Discovered fragments are stripped by default; set `crawl.followFragments: true`
+for hash-routed applications. Explicit seed fragments are always preserved.
+`crawl.excludePaths` contains case-insensitive decoded path prefixes; defaults
+are `/logout`, `/signout`, `/delete`. These exclusions are not a guarantee that GET
+requests cannot cause side effects. Audit authorized websites only. No forms are
+submitted and restricted traffic permits only GET/HEAD.
+
+`network.resourceOrigins` explicitly permits additional resource origins such as
+CDNs (not additional crawl targets). An origin has no path/query/fragment.
+Default ports are 80/443. Private/special IPv4/IPv6 addresses, including metadata,
+loopback, mapped/NAT64/transition addresses and mixed public/private DNS answers,
+are denied. An explicit `network.allowPrivateOrigins` exception must match a
+declared target/resource origin exactly; its explicit port is permitted. Only
+trusted local operators should add these exceptions. A new authenticated loopback
+proxy validates DNS then connects to the numeric address, preventing a second DNS
+lookup from redirecting that socket. Certificates are still verified by Chromium.
+
+Restricted runs request Chromium's sandbox and do not retry without it. They
+block service workers, downloads, WebSockets, dedicated workers and additional
+page traffic. QUIC and non-proxied WebRTC UDP are disabled. Blocked resources make
+the page audit fail rather than appear clean; list legitimate resource origins
+explicitly. Continuously busy pages can time out because restricted runs require
+network idle before accepting results. Legacy single-URL/project runs without
+`crawl` or `network` retain their previous trusted-operator network behavior.
+
+El rastreo limita páginas, profundidad, enlaces, peticiones, redirecciones, bytes
+y tiempo. La red privada se bloquea salvo excepciones de origen explícitas.
+Si se bloquean recursos o se agota un presupuesto, el informe indica el fallo o
+la cobertura incompleta. El modo restringido exige el sandbox de Chromium; no hay
+opción de producto para desactivarlo. Si el sistema no lo admite, falla.
+
+These are application HTTP(S) controls, not an OS firewall, protection against a
+browser/OS exploit, or approval to expose an audit service to untrusted callers.
+See [network design and validation](docs/NETWORK-CRAWLING.md) for exact limits,
+test environment exceptions and remaining deployment gates.

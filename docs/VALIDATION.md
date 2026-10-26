@@ -50,3 +50,42 @@ Initial remote Actions run: https://github.com/eligeunaweb/accesspilot-ai/action
 Remaining product work is explicit in ARCHITECTURE.md: secured egress/crawling, full rule guidance/localization, historical storage/redaction, local UI/API, journeys/manual evidence, scheduling/plugins, full platform installation and release acceptance. The project is not finished or ready for a stable release.
 
 Final report regression: unknown severity uses its own translated label; 84 local tests passed after this correction. Remote checks for that exact commit remain independent.
+
+
+## Restricted crawl/egress phase / Rastreo y red — 2026-10-26
+
+- Final local suite: **145 passed, 0 failed, 0 skipped**, 28.72 seconds. Windows,
+  Node 24.11.1, Chromium 1.64.1 package browser. Real HTTP, TLS CONNECT, Chromium,
+  axe and child CLI processes were executed against controlled loopback fixtures.
+- This suite used ACCESSPILOT_TEST_OUTER_SANDBOX=1 through a **test-only** loader.
+  Chromium sandbox startup itself failed in this nested Windows execution host
+  (exit 2147483651). Product restricted mode still requires its sandbox and has
+  no fallback. Native strict-mode validation remains a distinct CI/platform gate.
+- Verified: deterministic BFS/depth/source tracking; deduplication/exclusions;
+  page/link/deadline truncation; CSV coverage warnings; private/special IPv4/IPv6
+  classification; mixed DNS answers/rebinding rejection; numeric destination
+  pinning; exact-origin private exceptions; proxy authentication and credential
+  stripping; HTTP/TLS tunnel operation; HTTP/HTTPS redirect budgets; POST,
+  WebSocket and subresource blocks; blob-worker rejection; transfer/connection
+  exhaustion; cancellation while DNS resolution is pending; policy-version-aware
+  baseline comparisons. The forbidden local fixture received zero requests in
+  the browser bypass tests.
+- The real crawler CLI visited four fixture pages in BFS order and successfully
+  compared a second snapshot; /logout and out-of-origin links were not crawled.
+- Early test failures were investigated, not skipped: nested browser sandbox
+  unavailable; route-only redirect checks missed subsequent hops; a Windows
+  --import helper needed a file URL. Each issue was addressed and tests rerun.
+- npm audit: zero known vulnerabilities; no added dependencies or lockfile changes.
+- Three-page restricted crawl diagnostic, two repetitions: concurrency 1 took
+  3475/3453 ms; concurrency 2 took 2347/2293 ms. Node CPU 328–406 ms; sampled Node
+  RSS 128462848–172146688 bytes. The same test launcher adapter was used. These
+  numbers exclude Chromium CPU/RSS and are not throughput or superiority claims.
+- Previous head 70d3c5a remote run 40341411865 had five successful matrix jobs and
+  one cancelled job, so it was not a fully passing six-job run. New phase checks
+  must be read from their own commit. CI now cancels obsolete branch/PR duplicate
+  runs to reduce redundant work.
+
+Exact source and detailed boundaries: NETWORK-CRAWLING.md. OS firewall/process
+isolation, shared-worker/iframe adversarial review, manual assistive technology,
+large-site resources and a public/local job API remain outside the completed
+validation. This phase does not mark B2's future service-isolation gate closed.
