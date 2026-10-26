@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "My web portfolio",
+  "urls": ["https://example.com/", "https://example.org/"],
+  "concurrency": 2,
+  "timeoutMs": 30000
+}

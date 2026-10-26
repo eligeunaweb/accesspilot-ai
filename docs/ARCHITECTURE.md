@@ -13,7 +13,7 @@ Threat model: scanned pages and imported files are untrusted; local operator and
 | Gate | Deliverable | Acceptance evidence | State |
 |---|---|---|---|
 | A | Stable legacy CLI | 27 tests on Windows including real Chromium; remote CI pending | Local checks passed; remote pending |
-| B1 | Project JSON + explicit multi-site batches | Unknown keys/types/limits rejected; duplicate normalized URLs removed; bounded concurrency; deterministic order; partial failures; cancellation; real CLI fixture | In development |
+| B1 | Project JSON + explicit multi-site batches | Unknown keys/types/limits rejected; duplicate normalized URLs removed; bounded concurrency; deterministic order; partial failures; cancellation; real CLI fixture | 55 local tests passed (includes legacy); remote pending |
 | B2 | Scoped crawler and network boundary | Page/depth/origin/redirect/resource limits, adversarial egress fixtures, DNS rebinding + timeout/cancellation tests | Pending |
 | C | Reports and evidence | Versioned JSON, safe CSV, accessible interactive HTML, severity/WCAG indices, full incomplete evidence, ES/EN curated fixes; round-trip/security/browser tests | Pending |
 | D | History/compare | Atomic writes, migrations, retention/redaction, baseline scope/engine mismatch detection, no false resolutions for failed pages | Pending |
@@ -25,6 +25,6 @@ Priorities follow dependencies, not feature count. B1 is a subphase, not complet
 
 ## Quality budgets
 
-Configuration: at most 1 MiB, 100 explicit URLs, concurrency 1–4, per-page budget 1–120 seconds. Initial budgets are protective limits, not throughput claims. Batch output preserves input order. Each target has isolated state; independent targets continue after errors. Any failed/cancelled target makes CLI exit 2, taking precedence over violation exit 1. Run metadata measures wall time; resource benchmark separately includes browser children.
+Configuration: at most 1 MiB, 100 explicit URLs, concurrency 1â€“4, per-page budget 1â€“120 seconds. Initial budgets are protective limits, not throughput claims. Batch output preserves input order. Each target has isolated state; independent targets continue after errors. Any failed/cancelled target makes CLI exit 2, taking precedence over violation exit 1. Run metadata measures wall time; resource benchmark separately includes browser children.
 
 Documentation and portability: Node 22.12+, npm lockfile, no platform-specific shell assumptions in product code. Test Windows/Linux/macOS via Actions, never call an unexecuted matrix verified. No required SaaS or paid service. Preserve legacy single-URL output and exit semantics except previously documented HTTP error fix.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, copyFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, copyFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +19,7 @@ function run(args, script = cli) {
 }
 test('real browser integration and CLI E2E', {timeout:120000}, async t => {
   const server=createServer((req,res)=>{
+    if(req.url==='/slow'){const timer=setTimeout(()=>res.end('slow'),5000);timer.unref();return;}
     if(req.url==='/missing'){res.writeHead(404);res.end('missing');return;}
     res.setHeader('Content-Type','text/html; charset=utf-8');
     res.end('<!doctype html><html lang="en"><head><title>Fixture</title></head><body><main><h1>Fixture</h1><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="><button></button></main></body></html>');
@@ -51,6 +52,27 @@ test('real browser integration and CLI E2E', {timeout:120000}, async t => {
   });
   await t.test('invalid URL returns 2 without browser',async()=>{
     assert.equal((await run(['file:///secret'])).code,2);
+  });
+  await t.test('project CLI audits two sites and preserves a failed target',async()=>{
+    const second=createServer(server.listeners('request')[0]);
+    await new Promise(resolve=>second.listen(0,'127.0.0.1',resolve));
+    try {
+      const config=join(dir,'project.json');
+      await writeFile(config,JSON.stringify({schemaVersion:1,name:'Multi-site',concurrency:2,
+        urls:[url,`http://127.0.0.1:${second.address().port}`,url+'/missing']}));
+      const r=await run(['--project',config,'--format','json','--fail-on-violations']);
+      assert.equal(r.code,2,r.err);const data=JSON.parse(r.out);
+      assert.equal(data.totals.succeeded,2);assert.equal(data.totals.failed,1);
+      assert.match(data.pages[2].error,/404/);assert.ok(data.totals.affectedElements>=4);
+    } finally {await new Promise(resolve=>second.close(resolve));}
+  });
+  await t.test('real navigation timeout returns a failed audit',async()=>{
+    await assert.rejects(auditPage(url+'/slow',{timeoutMs:1000}),/timed out|Timeout/);
+  });
+  await t.test('real cancellation interrupts navigation',async()=>{
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),1000);
+    try {await assert.rejects(auditPage(url+'/slow',{signal:controller.signal}),/cancelled/);}
+    finally {clearTimeout(timer);}
   });
   await t.test('entrypoint supports spaces, percent and hash',async()=>{
     const script=fileURLToPath(new URL('../src/entry # % test.js',import.meta.url));
