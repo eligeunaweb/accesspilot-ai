@@ -111,3 +111,19 @@ controladas. El adaptador de pruebas no demuestra que el sandbox interno arranqu
 en este entorno. El modo de producto conserva ese requisito. No se expone ninguna
 API ni interfaz de trabajos hasta cerrar los controles de aislamiento y revisión
 que siguen pendientes.
+
+
+## Ubuntu CI namespace policy
+
+The first native Ubuntu 24.04 CI run failed with `No usable sandbox` because
+AppArmor blocked Chromium's user namespaces (132 passing, 13 failing tests).
+The CI workflow now loads a generated AppArmor profile for the **exact installed
+Chromium executable paths**, permitting `userns` for those paths only. It does not
+disable Chromium sandboxing or change the system-wide namespace restriction.
+This follows the selective profile approach in
+[Chromium's AppArmor guidance](https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md).
+The generator rejects out-of-cache paths, wildcards and policy-injection characters.
+It runs only on Linux GitHub Actions and requires the runner's administrator to
+load the profile. A user-writable browser executable still needs supply-chain
+trust: this is CI setup, not a new containment proof or an automatic installation
+step on user machines. The rerun must establish whether it works in that runner.

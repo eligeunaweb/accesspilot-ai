@@ -89,3 +89,10 @@ Exact source and detailed boundaries: NETWORK-CRAWLING.md. OS firewall/process
 isolation, shared-worker/iframe adversarial review, manual assistive technology,
 large-site resources and a public/local job API remain outside the completed
 validation. This phase does not mark B2's future service-isolation gate closed.
+
+
+Native Ubuntu 22-node job 121657895139 on bc3146d failed (132 pass / 13 fail)
+because AppArmor denied Chromium user namespaces. macOS/Node 22 on the same run
+passed the strict tests. The subsequent CI-only fix grants namespaces to exact
+installed Chromium paths; generator path/injection checks were executed locally.
+Native matrix results after that setup change must be checked on the new commit.

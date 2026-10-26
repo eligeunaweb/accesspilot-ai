@@ -23,5 +23,10 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Permit Chromium user namespaces on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          node scripts/ci-apparmor.js
+          sudo apparmor_parser -r "$RUNNER_TEMP/accesspilot-playwright-userns"
       - run: npm test
       - run: npm audit --audit-level=high
