@@ -328,3 +328,8 @@ Español: 260 pruebas locales aprobadas sin fallos ni omisiones; auditoría npm 
 ### Worker hardening and first real attempt
 
 The next local full run passed 271 tests, zero failed/skipped, 36.058 s, after adding strict null rejection and ownership-mismatch cleanup coverage. The real Docker job in run 40499072757 built image sha256:c92303f88e339fe63a9e2686efb3251f027fb422e92dfdaa868845e4a598308c but failed at sandbox acceptance before the first audit. This is a failed acceptance, not validation of a working backend. A bounded pre-audit startup diagnostic was added to investigate without disabling protections. Controlled coverage now also requests journeys, crawling and redirect cookies. Further CI result must be checked on the new head.
+
+
+### Redirect/decompression regression found by real containment
+
+The real container attempts exposed a Playwright route limitation: only the initial redirect request used the mediator. Earlier host compatibility fixtures could follow the next request on the host network and did not prove complete redirect/gzip mediation. Those claims are superseded by an offline browser regression checking every URL, HttpOnly cookies, gzip and JavaScript, now using CDP Fetch request-stage interception. CDP needs decoded response bodies; worker-side gzip/deflate/br decoding now has a strict aggregate output cap and tests for excessive expansion, malformed bodies and encoding stacks. Browser caching is disabled. The sandbox table parser also has positive and disabled/missing-layer regression tests. Latest real acceptance remains pending until the exact new-head Docker job passes; no earlier failed run is treated as a pass.

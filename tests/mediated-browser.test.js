@@ -6,11 +6,12 @@ import { once } from 'node:events';
 import { gzipSync } from 'node:zlib';
 import { chromium } from 'playwright';
 import './helpers/outer-sandbox.js';
+import AxeBuilder from '@axe-core/playwright';
 import { createRequestMediator } from '../src/request-mediator.js';
 
 // Transport compatibility only: this browser is NOT running inside network=none.
-// Production auditPage still uses its existing authenticated egress proxy.
-test('real Chromium consumes mediated redirects, gzip, HttpOnly cookies and assets', {timeout:30000},async t=>{
+// This offline host test is not OS containment; the optional Docker backend has separate real CI acceptance.
+test('offline Chromium mediates every redirect, gzip body, HttpOnly cookie and asset', {timeout:30000},async t=>{
   const received=[];
   const server=http.createServer((req,res)=>{
     received.push({path:req.url,cookie:req.headers.cookie});
@@ -25,29 +26,40 @@ test('real Chromium consumes mediated redirects, gzip, HttpOnly cookies and asse
   server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
   const origin=`http://127.0.0.1:${server.address().port}`;
   const mediator=createRequestMediator([origin],{allowPrivateOrigins:[origin]});t.after(()=>mediator.close());
-  const browser=await chromium.launch({headless:true,chromiumSandbox:true});t.after(()=>browser.close());
-  const context=await browser.newContext({serviceWorkers:'block',acceptDownloads:false});
-  const failures=[];
-  await context.route('**/*',async route=>{
-    const req=route.request();
-    try {
-      const response=await mediator.fetch({url:req.url(),method:req.method(),navigation:req.isNavigationRequest(),headers:await req.allHeaders()});
-      await route.fulfill({...response,body:Buffer.from(response.body,'base64')});
-    } catch(error){failures.push(error.message);await route.abort().catch(()=>{});}
-  });
-  const page=await context.newPage();const response=await page.goto(origin+'/start');
-  assert.equal(response.status(),200);assert.equal(page.url(),origin+'/page');assert.equal(await page.locator('h1').textContent(),'Mediated fixture');
-  const cookies=await context.cookies();assert.ok(cookies.some(cookie=>cookie.name==='session'&&cookie.value==='fixture'&&cookie.httpOnly));assert.ok(cookies.some(cookie=>cookie.name==='language'&&cookie.value==='es'));
+  const mediated=[];
+  const report=await auditPage(origin+'/start',{network:{allowPrivateOrigins:[origin]},mediate:request=>{mediated.push(new URL(request.url).pathname);return mediator.fetch(request);},
+    launch:async options=>{
+      const browser=await chromium.launch(options),create=browser.newContext.bind(browser);
+      browser.newContext=async opts=>{const context=await create(opts);await context.setOffline(true);return context;};return browser;
+    },analyze:async page=>{
+      assert.equal(page.url(),origin+'/page');assert.equal(await page.locator('h1').textContent(),'Mediated fixture');
+      const cookies=await page.context().cookies();assert.ok(cookies.some(cookie=>cookie.name==='session'&&cookie.value==='fixture'&&cookie.httpOnly));assert.ok(cookies.some(cookie=>cookie.name==='language'&&cookie.value==='es'));
+      return new AxeBuilder({page}).analyze();
+    }});
   assert.ok(received.find(entry=>entry.path==='/page').cookie.includes('session=fixture'));assert.ok(received.find(entry=>entry.path==='/asset.js').cookie.includes('session=fixture'));
-  assert.deepEqual(failures,[]);assert.equal(mediator.failed,false);assert.ok(mediator.bytes>0);
+  for(const path of ['/start','/page','/asset.js'])assert.ok(mediated.includes(path),'Unmediated request: '+path);
+  assert.equal(report.network.policyVersion,3);assert.equal(mediator.failed,false);assert.ok(mediator.bytes>0);
 });
 
 
-test('audit service performs real axe through mediated route fulfillment and marks policy 3', {timeout:30000},async t=>{
+test('audit service performs real axe through mediated CDP fulfillment and marks policy 3', {timeout:30000},async t=>{
   const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html lang="en"><head><title>Fixture</title></head><body><main><h1>Fixture</h1><button></button></main></body></html>');});
   server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
   const origin=`http://127.0.0.1:${server.address().port}`,network={allowPrivateOrigins:[origin]};
   const mediator=createRequestMediator([origin],network);t.after(()=>mediator.close());
   const report=await auditPage(origin,{network,mediate:mediator.fetch});
   assert.ok(report.violations.some(rule=>rule.id==='button-name'));assert.equal(report.network.policyVersion,3);assert.equal(mediator.failed,false);
+});
+
+
+test('offline mediated iframe auditing accepts same-origin frames and fails closed on cross-origin frames', {timeout:30000},async t=>{
+  let forbiddenHits=0;const foreign=http.createServer((req,res)=>{forbiddenHits++;res.end('foreign');});foreign.listen(0,'127.0.0.1');await once(foreign,'listening');t.after(()=>{foreign.closeAllConnections();return new Promise(resolve=>foreign.close(resolve));});
+  const foreignOrigin=`http://127.0.0.1:${foreign.address().port}`;
+  const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end(req.url==='/frame'?'<html lang="en"><title>Frame</title><h2>Frame</h2><button></button></html>':`<html lang="en"><title>Fixture</title><main><h1>Fixture</h1><iframe title="Fixture frame" src="${req.url==='/foreign'?foreignOrigin:'/frame'}"></iframe></main></html>`);});
+  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
+  const origin=`http://127.0.0.1:${server.address().port}`,network={allowPrivateOrigins:[origin,foreignOrigin]},scopeUrls=[origin,foreignOrigin];
+  const launch=async options=>{const browser=await chromium.launch(options),create=browser.newContext.bind(browser);browser.newContext=async opts=>{const context=await create(opts);await context.setOffline(true);return context;};return browser;};
+  const mediator=createRequestMediator(scopeUrls,network);t.after(()=>mediator.close());
+  const report=await auditPage(origin,{network,scopeUrls,launch,mediate:mediator.fetch});assert.ok(report.violations.some(rule=>rule.id==='button-name'));
+  await assert.rejects(auditPage(origin+'/foreign',{network,scopeUrls,launch,mediate:mediator.fetch}));assert.equal(forbiddenHits,0);
 });

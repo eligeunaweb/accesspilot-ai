@@ -1,3 +1,4 @@
+import {responseForChromium} from './mediated-response.js';
 import { validateJourney, runJourney } from './journey.js';
 import { validateSessionState, validateAuthentication } from './session.js';
 import { validateNetwork } from './network-policy.js';
@@ -47,7 +48,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     controller.signal.throwIfAborted();
     context = await browser.newContext({acceptDownloads:false, serviceWorkers:'block',...(sessionState?{storageState:sessionState}:{}),...(viewport?{viewport:{width:viewport.width,height:viewport.height}}:{})});
     controller.signal.throwIfAborted();
-    if(policy) {
+    if(policy&&!mediate) {
       await context.route('**/*',async route=>{
         const request=route.request();
         try {
@@ -58,14 +59,11 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
           if(request.frame().page()!==auditPageRef) throw new Error('Additional page traffic is blocked');
           let redirects=0;for(let previous=request.redirectedFrom();previous;previous=previous.redirectedFrom()) redirects++;
           if(redirects>(crawl?.maxRedirects ?? 5)) throw new Error('Redirect budget exceeded');
-          if(mediate) {
-            const response=await mediate({url:request.url(),method:request.method(),navigation:request.isNavigationRequest(),headers:await request.allHeaders()});
-            await route.fulfill({...response,body:Buffer.from(response.body,'base64')});
-          } else await route.continue();
+          await route.continue();
         } catch(error) {deny(error.message);await route.abort().catch(()=>{});}
       });
-      await context.routeWebSocket('**/*',socket=>{deny('WebSockets are blocked');socket.close();});
     }
+    if(policy)await context.routeWebSocket('**/*',socket=>{deny('WebSockets are blocked');socket.close();});
     const aborted = new Promise((_, reject) => {
       stopWaiting = () => reject(controller.signal.reason);
       controller.signal.addEventListener('abort', stopWaiting, {once:true});
@@ -74,6 +72,39 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     report = await Promise.race([aborted, (async () => {
       const page = await context.newPage();auditPageRef=page;
       if(policy) page.on('worker',()=>{deny('Dedicated workers are not supported in restricted audits');page.close().catch(()=>{});});
+      if(mediate) {
+        context.on('request',request=>{
+          try {
+            if(request.frame().page()!==page) {deny('Additional page traffic is blocked');request.frame().page().close().catch(()=>{});}
+          } catch {deny('Unattributed page traffic is blocked');}
+        });
+        page.on('requestfailed',()=>deny('Mediated page resource failed'));
+        page.on('framenavigated',frame=>{
+          if(frame===page.mainFrame()||frame.url()==='about:blank')return;
+          try {if(new URL(frame.url()).origin!==new URL(page.url()).origin)throw new Error('Cross-origin frames are not supported');}
+          catch {deny('Unsupported mediated frame');page.close().catch(()=>{});}
+        });
+        const session=await context.newCDPSession(page),tree=await session.send('Page.getFrameTree');
+        const mainFrameId=tree.frameTree.frame.id;let decodedBytes=0;
+        await session.send('Network.enable');await session.send('Network.setCacheDisabled',{cacheDisabled:true});
+        session.on('Fetch.requestPaused',async event=>{
+          try {
+            controller.signal.throwIfAborted();
+            if(++requestCount>(crawl?.maxRequestsPerPage??200))throw new Error('Request budget exceeded');
+            const navigation=event.resourceType==='Document';
+            policy.check(event.request.url,navigation);
+            if(navigation&&event.frameId!==mainFrameId&&new URL(event.request.url).origin!==new URL(page.url()).origin)throw new Error('Cross-origin frames are not supported');
+            const response=await mediate({url:event.request.url,method:event.request.method,headers:event.request.headers,navigation});
+            const fulfilled=responseForChromium(response,(crawl?.maxBytesPerPage??16*1024*1024)-decodedBytes);decodedBytes+=fulfilled.decodedBytes;
+            const {decodedBytes:unused,...payload}=fulfilled;
+            await session.send('Fetch.fulfillRequest',{requestId:event.requestId,...payload});
+          } catch(error) {
+            deny(error.message);await session.send('Fetch.failRequest',{requestId:event.requestId,errorReason:'BlockedByClient'}).catch(()=>{});
+          }
+        });
+        // Fetch request-stage interception includes redirect hops; Playwright route handlers do not.
+        await session.send('Fetch.enable',{patterns:[{urlPattern:'*',requestStage:'Request'}]});
+      }
       if(policy&&!mediate) {
         const session=await context.newCDPSession(page);let redirects=0;
         session.on('Fetch.requestPaused',async event=>{
