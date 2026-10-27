@@ -333,3 +333,12 @@ The next local full run passed 271 tests, zero failed/skipped, 36.058 s, after a
 ### Redirect/decompression regression found by real containment
 
 The real container attempts exposed a Playwright route limitation: only the initial redirect request used the mediator. Earlier host compatibility fixtures could follow the next request on the host network and did not prove complete redirect/gzip mediation. Those claims are superseded by an offline browser regression checking every URL, HttpOnly cookies, gzip and JavaScript, now using CDP Fetch request-stage interception. CDP needs decoded response bodies; worker-side gzip/deflate/br decoding now has a strict aggregate output cap and tests for excessive expansion, malformed bodies and encoding stacks. Browser caching is disabled. The sandbox table parser also has positive and disabled/missing-layer regression tests. Latest real acceptance remains pending until the exact new-head Docker job passes; no earlier failed run is treated as a pass.
+
+
+### First successful real contained browser acceptance
+
+Commit c5de84c6ab8789e5efcf897e47eb9129842a4cae, contained-browser job 122182003403, run https://github.com/eligeunaweb/accesspilot-ai/actions/runs/40501907480 : passed=true, stage=complete, image sha256:f67cdc8a2ca2bf9a96b330f4fcf2e65e8c81c1f90b55b4f626bab6383e609c83. The real Linux container audited axe violations with redirect/gzip/cookies, authenticated viewport/journey/history, two-page crawl, blocked foreign origin/POST, pending cancellation, CLI and owned cleanup. Host inspection, kernel guards and Chromium namespace/PID/network/seccomp/TSYNC checks were required before auditing. This records that job, not an overall pass of every pending matrix job or Docker Desktop.
+
+The preceding failed attempts are preserved in Actions; fixes addressed namespace-local chroot with zero container capabilities, GNU chroot denial exit status, current sandbox status labels, redirect-hop interception and bounded CDP body decoding. No unsafe fallback was added.
+
+Latest local full suite after proxy/startup-environment hardening: **286 passed, 0 failed/skipped**, 39.072 s, using the documented local test-only adapter and writable browser/TEMP settings. The new test rejects injected proxy credentials and Node hooks. Additional controlled TLS, WebSocket and metadata acceptance extends the next CI attempt; until that exact new-head job passes, those new container cases remain unvalidated. Native matrix CI never enables the local adapter. No dependencies added, merge, release or deployment.

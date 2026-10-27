@@ -2,7 +2,7 @@
 
 ## Español
 
-Estado: componente interno y pruebas de compatibilidad, **no backend de Chromium aislado**. La CLI y el visor mantienen su comportamiento; `auditPage` sigue utilizando el proxy autenticado existente. No hay una nueva opción pública, API de trabajos ni afirmación de contención del navegador. No se añaden dependencias.
+Estado actualizado: componente interno utilizado por el backend Docker experimental y opcional `--isolation-image`. La CLI predeterminada sigue utilizando el proxy autenticado y el visor sigue siendo de consulta. Véase [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md) para la integración CDP, comandos, aceptación real por imagen/commit y límites. No hay API de trabajos ni dependencias nuevas. Las pruebas de compatibilidad del anfitrión descritas abajo por sí solas no acreditan aislamiento.
 
 `src/request-mediator.js` prepara el transporte del futuro worker: el anfitrión recibe una descripción de petición HTTP, valida su alcance y realiza HTTP(S) con Node. No ofrece CONNECT ni un túnel TCP arbitrario al worker. Es distinto del proxy existente: incluso para HTTPS, el anfitrión conoce y comprueba el método HTTP. El diseño del worker deberá obligar mediante el sistema operativo a usar este canal; este módulo por sí solo no impide conexiones directas desde Chromium.
 
@@ -31,7 +31,7 @@ La prueba `isolation-desktop.json` aportada por el operador en esta sesión apro
 
 ## English
 
-Status: internal transport and compatibility tests, **not an isolated Chromium backend**. Existing CLI, authenticated proxy and read-only viewer behavior are unchanged. No dependencies or public job API are added.
+Updated status: internal transport used by the experimental opt-in Docker project backend. The default CLI still uses its authenticated proxy and the viewer remains read-only. See [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md) for CDP integration, exact image/run acceptance and remaining gates. No dependencies or web job API are added. Host-only compatibility tests alone do not establish OS containment.
 
 The future host mediator accepts HTTP request descriptions, enforces exact navigation/resource origins, GET/HEAD, DNS validation and numeric-IP pinning, and performs HTTP(S) itself. HTTPS checks certificates and the original hostname/SNI; there is no CONNECT or arbitrary socket tunnel. Private origins require explicit operator exceptions. The injectable CA is an internal fixture facility, never a worker/user-supplied setting.
 
@@ -44,3 +44,8 @@ Real HTTP/TLS tests exercise rejection, deadlines, cancellation, concurrency and
 Still required: versioned worker image, non-root sandboxed Chromium with OS-enforced network=none, strict protocol states/IDs/responses, ownership-checked supervisor cleanup, kernel limits, secret-safe stdio, adversarial real Docker browser tests and session/journey/history integration. Streaming/SSE, WebSockets, downloads and write methods are outside this transport's scope. Global job supervision and independent security review precede web job execution. Existing history data is not migrated.
 
 The operator's Docker Desktop Node prerequisite passed, including cleanup; it was not a Chromium test. Codex cannot access that engine's Windows named pipe. The supplied acceptance file is retained outside Git and copied to the delivery outputs.
+
+
+## CDP integration update / Actualización de integración CDP
+
+The early Playwright route fixture did not prove mediation of redirected destinations: the browser could follow a redirect on the host network. The current offline regression verifies every redirect URL and asset. The experimental worker now uses CDP Fetch request-stage interception, disables cache, decodes compressed bodies inside its cgroup with a strict aggregate decoded-byte limit and removes wire encoding before fulfillment. The host mediator itself still preserves/computes compressed transfer bytes. Same-origin frames are tested; cross-origin frames fail closed. Source and real-container acceptance are in CONTAINED-BROWSER.md/VALIDATION.md. Earlier future-work descriptions in this transport design are historical; the optional worker is implemented, while broader security/Desktop/service gates remain open.

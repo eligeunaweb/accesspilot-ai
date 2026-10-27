@@ -2,7 +2,7 @@
 
 ## Español
 
-Estado: refuerzo del transporte y prueba previa de aislamiento de procesos. **No se ha habilitado una API de auditorías web ni un backend de navegador aislado.** La revisión independiente y la integración de esa frontera con Chromium siguen pendientes.
+Estado actualizado: el transporte v2 y la prueba Node descritos aquí siguen disponibles. Se añade un backend Chromium **experimental y opcional** de proyecto con network=none y mediación stdio; véase [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md). La primera aceptación real Linux aprobó con el commit/imagen registrados en VALIDATION.md. Docker Desktop para Chromium, revisión independiente, supervisión global y API de trabajos continúan pendientes; el visor sigue siendo de consulta.
 
 ### Transporte restringido, versión de política 2
 
@@ -47,7 +47,7 @@ En el entorno Codex de esta sesión, el motor inicialmente no estaba arrancado. 
 |---|---|
 | Proxy con presupuestos propios, DNS y cierre permanente | Implementado; pruebas locales de transporte |
 | Perfil de proceso sin salida directa y con límites | Script de aceptación y trabajo CI; comprobar resultado por commit |
-| Navegador real dentro del entorno aislado con salida solo por mediador | Pendiente; la prueba Node sin red no lo implementa |
+| Navegador real dentro del entorno aislado con salida solo por mediador | Backend experimental con aceptación Linux; verificar commit/imagen exactos en VALIDATION.md. Desktop y revisión más amplia pendientes |
 | Bloqueo de acceso al host, LAN, metadatos, DNS/UDP y escapes desde Chromium | Pendiente con el backend real y varios entornos |
 | Cola, límites globales de CPU/RAM/procesos y recuperación de trabajos | Pendiente para el servicio; concurrencia CLI y límites por página existentes no equivalen a esto |
 | Revisión independiente de seguridad y tratamiento de sesiones/archivos | Pendiente |
@@ -74,3 +74,8 @@ References: [Node DNS](https://nodejs.org/api/dns.html), [Docker network modes](
 El operador ha aportado una aceptación satisfactoria del requisito Node en Docker Desktop, incluida la limpieza. Esto actualiza la falta de evidencia local descrita anteriormente; Codex sigue sin acceso al named pipe y no se ha probado Chromium dentro del contenedor. Se incorpora el componente HTTP(S)/NDJSON y una prueba de compatibilidad con Chromium en el host. El backend y la API de trabajos continúan pendientes. Véanse controles, límites y pruebas en [MEDIATED-TRANSPORT.md](MEDIATED-TRANSPORT.md).
 
 The operator supplied a passing Docker Desktop Node prerequisite, including cleanup. This updates the earlier absence of local operator evidence; Codex still cannot access the named pipe and Chromium has not been tested inside that container. The new HTTP(S)/NDJSON component and host-browser compatibility fixture are described in [MEDIATED-TRANSPORT.md](MEDIATED-TRANSPORT.md). Browser containment and web jobs remain pending.
+
+
+## Current experimental browser backend / Backend experimental actual
+
+The historical prerequisite-only status above is superseded for the opt-in project backend: see [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md). Default proxy audits remain policy 2. Docker audits use policy 3, mandatory namespace/PID/network/seccomp/TSYNC checks, zero container capabilities, network=none and bounded CDP/stdio HTTP mediation. The first successful Linux image/run is recorded in VALIDATION.md. This does not approve independent security, Docker Desktop Chromium, global job supervision or web execution. Retained old acceptance paragraphs describe their original Node/host-test scope.

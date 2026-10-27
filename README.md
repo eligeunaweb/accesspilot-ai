@@ -228,3 +228,6 @@ Interactive journeys / Recorridos interactivos: [guide](docs/INTERACTIVE-JOURNEY
 Manual review evidence / Evidencias de revisión manual: [guide](docs/MANUAL-REVIEW.md).
 
 Security boundary / Frontera de seguridad: [acceptance and limits](docs/SECURITY-BOUNDARY.md).
+
+
+Experimental contained Chromium / Chromium contenido experimental: build a reviewed local Docker worker image, resolve its immutable ID and select `--project project.json --isolation-image sha256:...`. Docker is optional for the existing CLI; the web viewer stays read-only. See the [bilingual operator and acceptance guide / guía bilingüe de operación y aceptación](docs/CONTAINED-BROWSER.md) for requirements, commands and remaining security/Desktop gates.

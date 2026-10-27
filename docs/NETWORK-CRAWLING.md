@@ -130,4 +130,4 @@ step on user machines. The rerun must establish whether it works in that runner.
 
 ## Transport policy v2 / Política de transporte v2
 
-See [Security boundary acceptance](SECURITY-BOUNDARY.md) for permanent request/byte/deadline exhaustion, independent HTTP/CONNECT admission, DNS deadline/cancellation and answer validation, optional OS prerequisite tests and the remaining web-execution gates. Real restricted audits now record network.policyVersion 2. No contained-browser backend or job API is enabled.
+See [Security boundary acceptance](SECURITY-BOUNDARY.md) for permanent request/byte/deadline exhaustion, independent HTTP/CONNECT admission, DNS deadline/cancellation and answer validation, optional OS prerequisite tests and the remaining web-execution gates. Real restricted audits now record network.policyVersion 2. The experimental project-only Docker backend uses policy 3 and CDP/stdio mediation; see [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md) for exact acceptance and limitations. No web job API is enabled.
