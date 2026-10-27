@@ -112,7 +112,9 @@ test('viewer handles empty history, pagination and independent session tokens',a
   assert.match(filtered.body,/q=2025-01&amp;from=2025-01-01&amp;to=2025-01-01&amp;page=2/);
   const last=await http(viewer.url+'?q=2025-01&from=2025-01-01&to=2025-01-01&page=2');
   assert.equal((last.body.match(/class="run-id"/g)??[]).length,1);
-  assert.match(filtered.body,new RegExp('after='+f.next));
+  // Same-millisecond saves use the record-ID tie-break, not write-call order.
+  const latest=(await listHistory(f.root,f.project))[0];
+  assert.ok(filtered.body.includes('after='+latest));
   const unmatched=await http(viewer.url+'?q=nothing-matches');assert.equal(unmatched.status,200);assert.match(unmatched.body,/No hay ejecuciones que coincidan/);
   for(const query of ['from=2023-02-29','from=2025-01-02&to=2025-01-01','q=%00','q=x&q=y','run='+f.first+'&q=x']) assert.equal((await http(viewer.url+'?'+query)).status,400);
   assert.notEqual(new URL(viewer.url).pathname,new URL(empty.url).pathname);

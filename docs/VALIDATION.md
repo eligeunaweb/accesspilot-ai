@@ -400,3 +400,8 @@ Verificación local: **360 pruebas satisfactorias**, ninguna fallida/omitida; pr
 ### Native CI contention follow-up
 
 Run 40551305202 at 334c748 passed seven jobs: Windows/Linux Node 22/24, macOS Intel Node 22, isolation prerequisite and controlled Docker browser/recovery. macOS Intel Node 24 cancelled the last E2E child at the unchanged parent 120-second deadline; all new service guard cases passed. Sequential scenario durations accumulated under concurrent browser-file load; contention remains the working diagnosis. npm test now uses one test file at a time, preserving every test and the E2E deadline. Full local serial repeat: 360/360 passed, no failures/cancellations/skips, 103435.2076 ms using the same restricted-host adapter and a diagnostic per-file ceiling of 120 seconds. Remote validation of this adjustment remains required.
+
+
+### Same-millisecond viewer fixture correction
+
+Serial-head run 40552688833 passed Windows/macOS Intel Node 22/24, Linux Node 22, isolation and real Docker acceptances. Linux Node 24 ran all 360 cases with one failed pagination assertion: the fixture saved two records in the same millisecond and incorrectly assumed the second call was latest. History orders record IDs descending, including UUID tie-break. The viewer correctly linked to the first listed ID. The assertion now obtains that ID via the history interface and verifies the unfiltered comparison target; no product ordering, timeout or scenario was changed. This run remains a failure (359/360 on that job), not an 8/8 pass.
