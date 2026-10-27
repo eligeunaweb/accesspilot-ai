@@ -86,7 +86,7 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
           phase='sandbox';send(child.stdin,{type:'start',job}).catch(stop);return;
         }
         if(value?.type==='sandbox') {
-          fields(value,['type','namespace','seccomp','directDenied']);if(phase!=='sandbox'||value.namespace!==true||value.seccomp!==true||value.directDenied!==true)throw new Error('Invalid browser sandbox proof');phase='audit';return;
+          fields(value,['type','namespace','pidNamespace','networkNamespace','seccomp','tsync','directDenied']);if(phase!=='sandbox'||value.namespace!==true||value.pidNamespace!==true||value.networkNamespace!==true||value.seccomp!==true||value.tsync!==true||value.directDenied!==true)throw new Error('Invalid browser sandbox proof');phase='audit';return;
         }
         if(value?.type==='request') {
           fields(value,['type','id','request']);if(phase!=='audit'||value.id!==lastId+1||++lastId>1000||inFlight>=68)throw new Error('Invalid worker request sequence');

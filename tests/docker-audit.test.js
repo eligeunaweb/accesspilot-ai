@@ -70,7 +70,7 @@ async function supervisorFixture(mode) {
       if(value.type==='start') {
         if(mode==='sequence')emit({type:'result',report:{}});
         else {
-          emit({type:'sandbox',namespace:true,seccomp:true,directDenied:true});
+          emit({type:'sandbox',namespace:true,pidNamespace:true,networkNamespace:true,seccomp:true,tsync:true,directDenied:true});
           const report=summarize({violations:[],passes:[],incomplete:[],inapplicable:[],testEngine:{name:'axe-core',version:'4.14.0'}},value.job.url);report.network={policyVersion:3};
           emit({type:'result',report});setImmediate(()=>{child.stdout.end();child.emit('close',0);});
         }

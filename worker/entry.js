@@ -1,3 +1,4 @@
+import {requireChromiumSandbox} from '../src/chromium-proof.js';
 import {chromium} from 'playwright';
 import {auditPage} from '../src/audit.js';
 import {JsonLines,fields,send} from '../src/worker-protocol.js';
@@ -19,14 +20,14 @@ async function launch(options) {
   try {
     const context=await browser.newContext(),page=await context.newPage();
     await page.goto('chrome://sandbox');const text=await page.locator('body').innerText();
-    if(!/Namespace sandbox\s+Yes/.test(text)||!/Seccomp-BPF sandbox\s+Yes/.test(text))throw new Error('Chromium sandbox proof failed: '+text.slice(0,2000));
+    const sandbox=requireChromiumSandbox(text);
     for(const target of ['http://169.254.169.254/','http://10.0.0.1/','http://1.1.1.1/','http://[2606:4700:4700::1111]/']) {
       let directDenied=false;
       try {await page.goto(target,{timeout:3000});}
       catch(error) {directDenied=/net::ERR_(INTERNET_DISCONNECTED|ADDRESS_UNREACHABLE|NETWORK_ACCESS_DENIED|FAILED)/.test(error.message);}
       if(!directDenied)throw new Error('Chromium direct egress was not denied');
     }
-    await context.close();stage='audit';await output({type:'sandbox',namespace:true,seccomp:true,directDenied:true});return browser;
+    await context.close();stage='audit';await output({type:'sandbox',...sandbox,directDenied:true});return browser;
   } catch(error) {startupDiagnostic='proof: '+String(error.message).slice(0,4000);await browser.close();throw error;}
 }
 function mediate(request) {
