@@ -38,3 +38,7 @@ Contained CLI runs now use the FIFO supervisor documented in AUDIT-QUEUE.md. Opt
 ## Ownership recovery increment
 
 WORKER-RECOVERY.md describes immutable pre-create ownership intents, exact Docker engine/name/label/image/ID validation and offline recovery under the queue lock. Pending intents block auditing; preview is separate from apply, failed apply retains the lock, and jobs never replay. Automatic abandoned-lock takeover, cross-process scheduling, power-loss durability and independent security review remain pending.
+
+## Reduced-data export increment
+
+SHARING-REPORTS.md documents an offline positive projection for sharing, exposed by CLI and protected read-only viewer. It omits source identifiers/free text, preserves unknown/failed coverage, and cannot be imported as canonical audit evidence. This does not redact private history or guarantee anonymity. Cross-process resource reservations, service security review and audit-execution UI remain pending.
