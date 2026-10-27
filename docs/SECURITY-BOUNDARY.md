@@ -68,3 +68,9 @@ Commands have bounded time/output. Owned containers are inspected before removal
 Before web execution: integrate a real Chromium worker with OS-enforced egress through a mediator, validate host/LAN/metadata/DNS/UDP/escape denial and sessions/files, enforce global job resources/cancellation/recovery, obtain independent security review, then implement a protected loopback job API. The existing history viewer remains read-only.
 
 References: [Node DNS](https://nodejs.org/api/dns.html), [Docker network modes](https://docs.docker.com/engine/network/drivers/), [Docker resource constraints](https://docs.docker.com/engine/containers/resource_constraints/), [Docker run security options](https://docs.docker.com/reference/cli/docker/container/run/), [IANA IPv4](https://www.iana.org/assignments/iana-ipv4-special-registry/), [IANA IPv6](https://www.iana.org/assignments/iana-ipv6-special-registry/).
+
+## Actualización: transporte mediado / Update: mediated transport
+
+El operador ha aportado una aceptación satisfactoria del requisito Node en Docker Desktop, incluida la limpieza. Esto actualiza la falta de evidencia local descrita anteriormente; Codex sigue sin acceso al named pipe y no se ha probado Chromium dentro del contenedor. Se incorpora el componente HTTP(S)/NDJSON y una prueba de compatibilidad con Chromium en el host. El backend y la API de trabajos continúan pendientes. Véanse controles, límites y pruebas en [MEDIATED-TRANSPORT.md](MEDIATED-TRANSPORT.md).
+
+The operator supplied a passing Docker Desktop Node prerequisite, including cleanup. This updates the earlier absence of local operator evidence; Codex still cannot access the named pipe and Chromium has not been tested inside that container. The new HTTP(S)/NDJSON component and host-browser compatibility fixture are described in [MEDIATED-TRANSPORT.md](MEDIATED-TRANSPORT.md). Browser containment and web jobs remain pending.

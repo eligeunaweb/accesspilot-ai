@@ -301,3 +301,15 @@ Final manual-evidence checks include expanded bilingual details passing axe, a b
 - Still required before web audit jobs: contained Chromium with mediated egress, adversarial browser/host/LAN/DNS/UDP tests, trusted image policy, independent security review, service-level resource/job recovery controls and protected API. TLS CONNECT does not inspect encrypted HTTP methods; the browser still supplies that defense. The current viewer remains read-only.
 
 227 pruebas locales aprobadas. El aislamiento Node sin red es una prueba previa, no una implementación del navegador aislado ni una certificación de seguridad. No se han realizado fusiones, releases ni despliegues.
+
+
+## 2026-10-27 — HTTP mediator and bounded worker framing
+
+- Local full suite: **260 passed, 0 failed, 0 skipped**, 34.912 s. Exact command: `node --import ./tests/helpers/outer-sandbox.js --test`, with the previously documented `ACCESSPILOT_TEST_OUTER_SANDBOX=1`, local Playwright browser path and writable test TEMP/TMP. The adapter is test-only and does not establish native local Chromium sandbox support.
+- New coverage: 22 host mediator HTTP/TLS tests, 10 NDJSON framing tests and 1 real host Chromium compatibility test. Fixtures verify TLS authentication, numeric DNS pinning, scope and methods, redirects, compressed bodies, multiple HttpOnly cookies, header stripping, transfer/request/queue/concurrency/deadline limits, permanent failure, cancellation/late DNS, truncated response and strict UTF-8/frame budgets.
+- `npm audit --json`: **0 known vulnerabilities** across 4 reported dependency entries. No dependencies changed or added; no claim of independent security review.
+- Operator-supplied Docker Desktop prerequisite: passed, cleanup removed; retained separately as `isolation-desktop.json` and copied to delivery outputs. This trusted Node probe does **not** run Chromium. Codex's named-pipe restriction remains.
+- Chromium compatibility uses `route.fulfill` in a host browser. No Docker browser backend, no web job API and no claim that direct browser egress is now contained. The new internal transport is not selected by existing CLI operations. See [MEDIATED-TRANSPORT.md](MEDIATED-TRANSPORT.md).
+- CI results for the new commit must be recorded separately after completion; the previously passing run cannot validate these additions.
+
+Español: 260 pruebas locales aprobadas sin fallos ni omisiones; auditoría npm sin vulnerabilidades conocidas. Las 33 pruebas nuevas verifican transporte, protocolo y compatibilidad con Chromium real en el anfitrión. No acreditan Chromium aislado en Docker ni habilitan trabajos web. El requisito Node de Docker Desktop aportado por el operador sí aprobó, incluida su limpieza.
