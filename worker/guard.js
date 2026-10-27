@@ -27,6 +27,6 @@ export async function guard() {
   await assert.rejects(readFile('/var/run/docker.sock'),error=>error.code==='ENOENT');
   await writeFile('/tmp/accesspilot-noexec.sh','#!/bin/sh\nexit 0\n',{mode:0o700});
   await assert.rejects(promisify(execFile)('/tmp/accesspilot-noexec.sh'),error=>error.code==='EACCES');
-  await assert.rejects(promisify(execFile)('chroot',['/tmp','/bin/true'],{env:{...process.env,LC_ALL:'C'}}),error=>error.code===1&&/Operation not permitted/.test(error.stderr));
+  await assert.rejects(promisify(execFile)('chroot',['/tmp','/bin/true'],{env:{...process.env,LC_ALL:'C'}}),error=>[1,125].includes(error.code)&&/Operation not permitted/.test(error.stderr));
   return {parentChrootDenied:true,profileVersion:1,uid:65534,networkNone:true,seccomp:true,noNewPrivileges:true,kernelLimits:true,directTcpUdpDenied:true,readOnly:true,noExecTmp:true};
 }

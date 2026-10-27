@@ -4,13 +4,13 @@ import {JsonLines,fields,send} from '../src/worker-protocol.js';
 import {validateJob} from '../src/worker-job.js';
 import {guard} from './guard.js';
 
-let started=false,finished=false,nextId=0,stage='guard',startupDiagnostic;
+let started=false,finished=false,nextId=0,stage='guard',startupDiagnostic,guardDiagnostic;
 const pending=new Map(),controller=new AbortController();
 const output=value=>send(process.stdout,value);
 function fatal() {
   if(finished)return;finished=true;controller.abort();
   for(const item of pending.values())item.reject(new Error('Worker channel failed'));pending.clear();
-  output({type:'error',code:stage+'-failed',message:'Contained audit failed',...(stage==='sandbox'&&startupDiagnostic?{startupDiagnostic}:{})}).finally(()=>process.exit(2));
+  output({type:'error',code:stage+'-failed',message:'Contained audit failed',...(stage==='sandbox'&&startupDiagnostic?{startupDiagnostic}:{}),...(stage==='guard'&&guardDiagnostic?{guardDiagnostic}:{})}).finally(()=>process.exit(2));
 }
 async function launch(options) {
   let browser;
@@ -41,7 +41,7 @@ async function start(job) {
     const report=await auditPage(job.url,{...job,launch,signal:controller.signal,mediate});
     if(pending.size)throw new Error('Unfinished mediated requests');
     finished=true;await output({type:'result',report});process.exit(0);
-  } catch {fatal();}
+  } catch(error) {guardDiagnostic=String(error.message).slice(0,2000);fatal();}
 }
 function message(value) {
   if(finished)throw new Error('Worker finished');
@@ -63,4 +63,4 @@ try {
   process.stdin.on('end',()=>{try{reader.end();if(!finished)fatal();}catch{fatal();}});
   process.stdin.on('error',fatal);process.stdout.on('error',()=>process.exit(2));
   await output({type:'ready',proof});
-} catch {fatal();}
+} catch(error) {guardDiagnostic=String(error.message).slice(0,2000);fatal();}

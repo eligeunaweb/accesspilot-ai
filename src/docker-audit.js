@@ -97,10 +97,11 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
           accepted=reportFromWorker(value.report,job,imageId,mediator);phase='finished';child.stdin.end();return;
         }
         if(value?.type==='error') {
-          fields(value,['type','code','message','startupDiagnostic']);
+          fields(value,['type','code','message','startupDiagnostic','guardDiagnostic']);
           if(!['guard-failed','sandbox-failed','audit-failed'].includes(value.code))throw new Error('Invalid worker failure');
           if(value.startupDiagnostic!==undefined&&(phase!=='sandbox'||value.code!=='sandbox-failed'||typeof value.startupDiagnostic!=='string'||value.startupDiagnostic.length>4100))throw new Error('Invalid startup diagnostic');
-          throw new Error('Worker rejected execution: '+value.code+(value.startupDiagnostic?' / '+value.startupDiagnostic:''));
+          if(value.guardDiagnostic!==undefined&&(phase!=='ready'||value.code!=='guard-failed'||typeof value.guardDiagnostic!=='string'||value.guardDiagnostic.length>2000))throw new Error('Invalid guard diagnostic');
+          throw new Error('Worker rejected execution: '+value.code+(value.guardDiagnostic?' / '+value.guardDiagnostic:'')+(value.startupDiagnostic?' / '+value.startupDiagnostic:''));
         }
         throw new Error('Contained worker sent an unknown message');
       });
