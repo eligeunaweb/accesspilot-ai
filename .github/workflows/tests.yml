@@ -54,3 +54,31 @@ jobs:
           name: isolation-prerequisite
           path: isolation-result.json
           if-no-files-found: ignore
+
+  contained-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Load scoped container AppArmor profile
+        run: sudo apparmor_parser -r worker/apparmor.profile
+      - name: Build versioned acceptance worker
+        run: docker build --file worker/Dockerfile --tag accesspilot-worker:ci .
+        timeout-minutes: 15
+      - name: Audit real pages through contained Chromium and stdio mediator
+        run: |
+          image_id="$(docker image inspect accesspilot-worker:ci --format '{{.Id}}')"
+          node scripts/contained-acceptance.js --image "$image_id" --output contained-result.json
+        timeout-minutes: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contained-browser
+          path: contained-result.json
+          if-no-files-found: ignore

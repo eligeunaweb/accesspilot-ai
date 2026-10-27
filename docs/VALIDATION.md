@@ -313,3 +313,13 @@ Final manual-evidence checks include expanded bilingual details passing axe, a b
 - CI results for the new commit must be recorded separately after completion; the previously passing run cannot validate these additions.
 
 Español: 260 pruebas locales aprobadas sin fallos ni omisiones; auditoría npm sin vulnerabilidades conocidas. Las 33 pruebas nuevas verifican transporte, protocolo y compatibilidad con Chromium real en el anfitrión. No acreditan Chromium aislado en Docker ni habilitan trabajos web. El requisito Node de Docker Desktop aportado por el operador sí aprobó, incluida su limpieza.
+
+
+## 2026-10-27 — Contained Chromium implementation (CI acceptance pending)
+
+- Full local suite: **270 passed, 0 failed/skipped**, 31.892 s. Command: `node --import ./tests/helpers/outer-sandbox.js --test`, with documented test-only adapter, local browser path and writable TEMP/TMP. Includes real host Chromium/axe through the mediator and mocked Docker supervisor inspection/protocol/cleanup; mocks are not containment evidence.
+- Initial development runs found a misplaced shebang in the CLI; it was fixed before this successful full run. Other initial fixture attempts lacked network permission/local browser/TEMP settings; those attempts are not counted as successful validation. Local named-pipe access remains unavailable.
+- `npm audit --json`: 0 known vulnerabilities after granting network permission; an earlier attempt failed DNS and was not an audit pass. No dependencies added.
+- New eighth CI job builds the Playwright-version-matched worker and runs real controlled Docker browser acceptance. Its result must be checked on the published head; the previous seven-job pass does not validate this backend.
+- Experimental CLI option is project-only, image-ID-only and incompatible with offline/viewer operations. Old CLI paths and old manual evidence fingerprints remain tested. Network policy 3 requires isolation provenance; changed images are incomparable.
+- See [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md) for commands, kernel controls, third-party notices and remaining security/production/Docker Desktop gates. No release, merge or deployment.
