@@ -50,3 +50,6 @@ SHARED-RESOURCES.md adds optional shared-domain exclusion across CLI supervisors
 ## Local response admission and internal security review
 
 LOCAL-SERVICE-REVIEW.md records the internal review, existing boundaries and unresolved execution-service gates. The read-only viewer holds admission until handler and response completion, reserves pending report-body bytes and enforces frequency/absolute output deadlines plus strict HTTP framing/security headers. These are not total host heap/CPU guarantees or independent security approval. No web execution API is enabled.
+
+
+Seguimiento / Follow-up: [REPORT-RENDERING.md](REPORT-RENDERING.md) describe separación de renderizado en procesos desechables. La lectura/validación inicial permanece en el anfitrión; la puerta P1 de recursos no se considera cerrada.

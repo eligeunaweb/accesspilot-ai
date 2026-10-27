@@ -60,3 +60,6 @@ Admission now spans both handler completion and response finish/close. Early dis
 Response finish means handing data to Node's transport, not client acknowledgement. These controls are not a total heap, kernel-buffer or synchronous CPU bound; timers cannot preempt synchronous work. Native filesystem work may outlive a disconnected response, retaining its admission slot. Original private records and reduced-data sharing semantics are preserved.
 
 Duplicate security/framing headers, unknown Fetch Metadata, GET bodies, chunked payloads, Expect, CONNECT and Upgrade are rejected. The viewer still exposes GET queries/downloads only. Future mutation routes require a separate allowlisted job contract, authorization, CSRF/body/rate limits and negative tests; no audit execution/cancellation API is enabled. Independent security review, stronger host resource isolation, privacy/ACL/retention, broader environment and human acceptance remain open gates. See the acceptance table above and per-head validation evidence.
+
+
+Seguimiento / Follow-up: [REPORT-RENDERING.md](REPORT-RENDERING.md) describe separación de renderizado en procesos desechables. La lectura/validación inicial permanece en el anfitrión; la puerta P1 de recursos no se considera cerrada.

@@ -1,3 +1,4 @@
+import {createReportRenderer} from './report-renderer.js';
 import {checkViewerRequest,createLocalServiceGuard} from './local-service-guard.js';
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
@@ -5,13 +6,9 @@ import { validateProject } from './project.js';
 import { listHistory, readHistory, projectKey, historyWindow } from './history.js';
 import { validateWorkspace } from './workspace.js';
 import { historyFilters, filterHistory } from './history-filter.js';
-import { compareAudits } from './comparison.js';
 import { evidenceFilters } from './evidence-filter.js';
-import { richRunView, historyTrendView } from './history-detail-view.js';
-import {renderShareReport} from './share-report.js';
-import { exportHistory } from './history-export.js';
 
-import { copy, escape, shell, query, comparisonView, historyView, dashboardView } from './viewer-html.js';
+import { copy, escape, shell, query, historyView, dashboardView } from './viewer-html.js';
 
 /** Read-only, operator-selected projects only. Never launches audit jobs. */
 export async function startHistoryViewer({root, project:input, workspace:workspaceInput, port=0, limits}) {
@@ -23,6 +20,7 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
   if(!Number.isInteger(port)||port<0||port>65535) throw new Error('Viewer port must be 0–65535');
   const session=`/${randomBytes(32).toString('hex')}/`;
   const guard=createLocalServiceGuard(limits);
+  const renderer=createReportRenderer();
   let origin;
   const server=createServer({maxHeaderSize:8192,connectionsCheckingInterval:1000}, async(req,res)=>{
     const nonce=randomBytes(16).toString('base64');
@@ -44,6 +42,9 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
     const admission=guard.admit(res);
     if(!admission.lease) {if(admission.status===429)res.setHeader('Retry-After','1');reject(admission.status);return;}
     lease=admission.lease;
+    const controller=new AbortController(),abort=()=>controller.abort();
+    res.once('close',abort);
+    const render=(operation,payload)=>renderer.render(operation,payload,{signal:controller.signal});
     try {
       const url=new URL(req.url,origin);
       let project=single;
@@ -89,19 +90,19 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
         const [snapshot]=await readHistory(root,project,[run]);title=t.run;
         if(download) {
           const shared=download.startsWith('share-'),format=shared?download.slice(6):download;
-          const output=shared?renderShareReport(snapshot,format,lang):exportHistory(snapshot,format,lang);
+          const output=await render('export',{snapshot,format,lang,shared});
           const type={json:'application/json',html:'text/html',csv:'text/csv'}[format];
           reply(200,{'Content-Type':`${type}; charset=utf-8`,'Content-Disposition':`attachment; filename="accesspilot-${shared?'shared-summary':'evidence'}.${format}"`},output);return;
         }
         const downloads=['json','html','csv'].map(format=>`<a href="${escape(query(base,lang,{run,download:format}))}">${lang==='es'?'Descargar evidencia':'Download evidence'} ${format.toUpperCase()}</a>`).join(' · ');
         const sharedDownloads=['json','html','csv'].map(format=>`<a href="${escape(query(base,lang,{run,download:'share-'+format}))}">${lang==='es'?'Resumen para compartir':'Shared summary'} ${format.toUpperCase()}</a>`).join(' · ');
-        body=`<p class="run-id">${escape(run)}</p><p>${downloads}</p><p>${sharedDownloads}</p><p>${lang==='es'?'Los resúmenes reducen datos sensibles; revísalos antes de compartir. No sustituyen la evidencia original.':'Summaries reduce sensitive data; review before sharing. They do not replace original evidence.'}</p>${richRunView(snapshot,evidence,lang,base,run)}`;
+        body=`<p class="run-id">${escape(run)}</p><p>${downloads}</p><p>${sharedDownloads}</p><p>${lang==='es'?'Los resúmenes reducen datos sensibles; revísalos antes de compartir. No sustituyen la evidencia original.':'Summaries reduce sensitive data; review before sharing. They do not replace original evidence.'}</p>${await render('detail',{snapshot,evidence,lang,base,run})}`;
       } else if(before&&after) {
         const snapshots=await readHistory(root,project,[before,after]);title=t.result;
-        body=`<p class="run-id">${escape(t.before)}: ${escape(before)}<br>${escape(t.after)}: ${escape(after)}</p>${comparisonView(compareAudits(...snapshots),t)}`;
+        body=`<p class="run-id">${escape(t.before)}: ${escape(before)}<br>${escape(t.after)}: ${escape(after)}</p>${await render('compare',{snapshots,lang})}`;
       } else if(view==='trends') {
         title=lang==='es'?'Tendencias del historial':'History trends';
-        body=historyTrendView(await historyWindow(root,project),lang,base);
+        body=await render('trends',{window:await historyWindow(root,project),lang,base});
       } else {
         const all=await listHistory(root,project),ids=filterHistory(all,filters),offset=(Number(page??1)-1)*50;
         if(offset>0&&offset>=ids.length) {reject(404);return;}
@@ -114,7 +115,7 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
     } catch(error) {
       const notFound=error.code==='HISTORY_NOT_FOUND';
       reply(notFound?404:503,{'Content-Type':'text/plain; charset=utf-8'},notFound?'History record not found':'History unavailable. Check records and permissions using the CLI.');
-    } finally { lease.done(); }
+    } finally {res.off('close',abort);lease.done();}
   });
   const refuseExpectation=(_req,res)=>{res.writeHead(417,{'Connection':'close','Content-Length':'0'});res.end();};
   server.on('checkContinue',refuseExpectation);server.on('checkExpectation',refuseExpectation);
@@ -124,5 +125,5 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
   server.requestTimeout=10000;server.headersTimeout=10000;server.keepAliveTimeout=1000;server.maxRequestsPerSocket=100;
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   origin=`http://127.0.0.1:${server.address().port}`;
-  return {url:origin+session,close:()=>new Promise((resolve,reject)=>{guard.close();server.close(error=>error?reject(error):resolve());server.closeAllConnections();})};
+  return {url:origin+session,close:()=>new Promise((resolve,reject)=>{guard.close();server.close(error=>{renderer.close().then(()=>error?reject(error):resolve(),reject);});server.closeAllConnections();})};
 }
