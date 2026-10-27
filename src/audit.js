@@ -36,7 +36,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     if(network) {
       policy=createNetworkPolicy(scopeUrls,network);
       policy.check(url,true);
-      proxy=await startEgressProxy(policy,{maxBytes:crawl?.maxBytesPerPage,timeoutMs:Math.min(timeoutMs,10000),maxRedirects:crawl?.maxRedirects});
+      proxy=await startEgressProxy(policy,{maxBytes:crawl?.maxBytesPerPage,timeoutMs:Math.min(timeoutMs,10000),maxRedirects:crawl?.maxRedirects,maxRequests:crawl?.maxRequestsPerPage,maxDurationMs:timeoutMs});
       launchOptions.proxy={server:proxy.server,username:proxy.username,password:proxy.password,bypass:'<-loopback>'};
       launchOptions.chromiumSandbox=true;
       launchOptions.args=['--disable-quic','--dns-prefetch-disable','--force-webrtc-ip-handling-policy=disable_non_proxied_udp'];
@@ -110,7 +110,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
       },crawl.maxLinksPerPage);
       if(proxy) {
         if(blocked.length||proxy.failures.length) throw new Error('Restricted audit incomplete: '+[...blocked,...proxy.failures].join('; '));
-        evidence.network={policyVersion:1,requests:requestCount,transferBytes:proxy.bytes};
+        evidence.network={policyVersion:2,requests:requestCount,transferBytes:proxy.bytes};
         await page.close();
       }
       return evidence;

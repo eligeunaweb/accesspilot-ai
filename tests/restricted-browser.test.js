@@ -13,7 +13,7 @@ test('restricted browser audits explicit loopback exception through authenticate
  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(r=>server.close(r)));
  const url=`http://127.0.0.1:${server.address().port}`;
  const report=await auditPage(url,{network:{allowPrivateOrigins:[url]},crawl:{maxLinksPerPage:20}});
- assert.ok(report.violations.some(rule=>rule.id==='button-name'));assert.equal(report.network.policyVersion,1);
+ assert.ok(report.violations.some(rule=>rule.id==='button-name'));assert.equal(report.network.policyVersion,2);
  assert.deepEqual(report.discovery.links,[url+'/next']);assert.ok(report.network.transferBytes>0);
 });
 

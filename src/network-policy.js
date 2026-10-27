@@ -44,11 +44,25 @@ export function createNetworkPolicy(urls, config = {}) {
   }
   return {check,network,navigationOrigins,resourceOrigins,privateOrigins};
 }
-export async function resolveTarget(value, policy, {lookup = dnsLookup} = {}) {
+export async function resolveTarget(value, policy, {lookup = dnsLookup,timeoutMs=10000,signal} = {}) {
+  if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>120000) throw new Error('Invalid DNS timeout');
+  signal?.throwIfAborted();
   const url=policy.check(value);
   const hostname=url.hostname.replace(/^\[|\]$/g,'');
-  const entries=isIP(hostname) ? [{address:hostname,family:isIP(hostname)}] : await lookup(hostname,{all:true,verbatim:true});
-  if(!Array.isArray(entries)||!entries.length||entries.some(e=>!isIP(e.address))) throw new Error('DNS returned no valid addresses');
+  let timer,cancel;
+  let entries;
+  try {
+    entries=isIP(hostname) ? [{address:hostname,family:isIP(hostname)}] : await Promise.race([
+      Promise.resolve().then(()=>{signal?.throwIfAborted();return lookup(hostname,{all:true,verbatim:true});}),
+      new Promise((_,reject)=>{
+        timer=setTimeout(()=>reject(new Error('DNS resolution deadline exceeded')),timeoutMs);
+        cancel=()=>reject(new Error('DNS resolution cancelled'));
+        signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted) cancel();
+      })
+    ]);
+    signal?.throwIfAborted();
+  } finally {clearTimeout(timer);if(cancel) signal?.removeEventListener('abort',cancel);}
+  if(!Array.isArray(entries)||!entries.length||entries.length>64||entries.some(e=>!e||!isIP(e.address)||e.family!==isIP(e.address))) throw new Error('DNS returned invalid or excessive addresses');
   if(!policy.privateOrigins.has(url.origin)&&entries.some(e=>!isPublicAddress(e.address))) throw new Error('Private or special-purpose network address blocked');
   const selected=entries.find(e=>isIP(e.address)===4) ?? entries[0];
   // Transport connects to this numeric address, never resolving the hostname again.
