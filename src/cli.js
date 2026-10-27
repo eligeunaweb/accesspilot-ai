@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createReviewTemplate, attachManualReview } from './manual-review-service.js';
+import { readConfiguration } from './project.js';
 import { loadSessionState } from './session.js';
 import { auditPage } from './audit.js';
 import { pathToFileURL } from 'node:url';
@@ -21,6 +23,8 @@ function usage() {
   console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
   console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
   console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
+  console.log('Manual template: --project config.json --review-template saved.json [--output review.json]');
+  console.log('Attach manual review: --project config.json --review-audit saved.json --manual-review review.json --history directory');
   console.log('Import evidence: --project config.json --history directory --import-history saved.json');
 }
 export async function main(args=process.argv.slice(2)) {
@@ -46,6 +50,20 @@ export async function main(args=process.argv.slice(2)) {
     if (opts.project) {
       const project = await loadProject(opts.project);
       if (opts.lang) project.language = opts.lang;
+      if(opts['review-template']||opts['manual-review']) {
+        const snapshot=await loadSnapshot(opts['review-template']??opts['review-audit'],{enrich:true});
+        if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Manual review audit belongs to another project');
+        if(opts['review-template']) {
+          const output=JSON.stringify(createReviewTemplate(snapshot),null,2);
+          if(opts.output) {await writeFile(opts.output,output,{encoding:'utf8',flag:'wx',mode:0o600});console.log('Manual review template written');}
+          else console.log(output);
+        } else {
+          const reviewed=attachManualReview(snapshot,await readConfiguration(opts['manual-review'],'Manual review'));
+          const id=await saveHistory(opts.history,reviewed);
+          console.log(JSON.stringify({schemaVersion:1,kind:'manual-review-import',id}));
+        }
+        return 0;
+      }
       if(opts['import-history']) {
         const snapshot=await loadSnapshot(opts['import-history'],{enrich:true});
         if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Imported history belongs to another project');

@@ -1,3 +1,4 @@
+import { manualReviewHTML } from './manual-review-view.js';
 import { journeyLabel } from './journey.js';
 import { validateSnapshot } from './comparison.js';
 import { csvCell, htmlDocument, escapeHtml } from './report.js';
@@ -22,9 +23,10 @@ export function exportHistory(input,format,language) {
       if(bytes>40*1024*1024) throw new Error('History CSV exceeds 40 MiB; use JSON');
       rows.push(line);
     };
+    const manual=!!snapshot.manualReviews;
     const auth=snapshot.project.authentication;
-    const add=(row,viewport,journey)=>emit([...row,viewport?.name??'',viewport?.width??'',viewport?.height??'',...(auth?[auth.profile]:[]),...(snapshot.project.journeys?[journeyLabel(journey)]:[])]);
-    emit(['record_type','status','url','rule','severity','wcag','target','correction','verification','guidance_source','coverage_complete','review_rules','viewport','viewport_width','viewport_height',...(auth?['authentication_profile']:[]),...(snapshot.project.journeys?['journey']:[])]);
+    const add=(row,viewport,journey)=>emit([...row,viewport?.name??'',viewport?.width??'',viewport?.height??'',...(auth?[auth.profile]:[]),...(snapshot.project.journeys?[journeyLabel(journey)]:[]),...(manual?['','','','','','','']:[])]);
+    emit(['record_type','status','url','rule','severity','wcag','target','correction','verification','guidance_source','coverage_complete','review_rules','viewport','viewport_width','viewport_height',...(auth?['authentication_profile']:[]),...(snapshot.project.journeys?['journey']:[]),...(manual?['manual_batch','manual_check','reviewer','reviewed_at','method','environment','manual_evidence']:[])]);
     add(['run','','','','','','','','','',metrics.complete??'unknown',metrics.review??'unknown']);
     for(const page of snapshot.pages) {
       add(['page',page.status,page.url,'','','','','','','','',''],page.viewport,page.journey);
@@ -34,6 +36,10 @@ export function exportHistory(input,format,language) {
         const {advice,source}=guidance(rule,lang);
         for(const node of rule.nodes.length?rule.nodes:[{target:null}]) add([kind,page.status,page.url,rule.id,rule.impact??'unknown',(rule.wcag??[]).join('; '),node.target===null?'':JSON.stringify(node.target),advice.correction,advice.verification,source,'',''],page.viewport,page.journey);
       }
+    }
+    for(const batch of snapshot.manualReviews??[]) for(const check of batch.checks) {
+      const page=snapshot.pages.find(page=>page.url===check.url&&(page.viewport?.name??null)===check.viewport&&(page.journey?.name??null)===check.journey);
+      emit(['manual-declaration',check.status,check.url,'','',check.criteria.join('; '),'','','','','','',page.viewport?.name??'',page.viewport?.width??'',page.viewport?.height??'',...(auth?[auth.profile]:[]),...(snapshot.project.journeys?[check.journey??'']:[]),batch.id,check.id,batch.reviewer,batch.reviewedAt,check.method,check.environment,check.evidence]);
     }
     return rows.join('');
   }
@@ -55,7 +61,7 @@ export function exportHistory(input,format,language) {
       <h3>${escapeHtml(t.review)} (${escapeHtml(report.incomplete??unknown)})</h3>${report.incompleteDetails==null?`<p>${unknown}</p>`:rulesHTML(report.incompleteDetails)}</section>`;
   }).join('');
   const body=`${snapshot.project.authentication?`<p>${lang==='es'?'Perfil de acceso':'Access profile'}: ${escapeHtml(snapshot.project.authentication.profile)}</p>`:''}<p>${escapeHtml(provenance)}</p><p>${escapeHtml(t.disclaimer)}</p><p>${escapeHtml(snapshot.generatedAt??unknown)}</p><p>${lang==='es'?'Páginas auditadas/fallidas/canceladas':'Audited/failed/cancelled pages'}: ${metrics.pages.succeeded}/${metrics.pages.failed}/${metrics.pages.cancelled}</p><p>${lang==='es'?'Cobertura completa del alcance configurado':'Complete configured scope'}: ${escapeHtml(metrics.complete??unknown)}</p>${pages}`;
-  const html=htmlDocument(snapshot.project.name,lang,body);
+  const html=htmlDocument(snapshot.project.name,lang,body+manualReviewHTML(snapshot,lang));
   if(Buffer.byteLength(html)>40*1024*1024) throw new Error('History HTML exceeds 40 MiB; use JSON');
   return html;
 }

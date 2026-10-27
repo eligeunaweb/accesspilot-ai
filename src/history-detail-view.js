@@ -1,3 +1,4 @@
+import { manualReviewHTML } from './manual-review-view.js';
 import { journeyLabel } from './journey.js';
 import { escapeHtml as escape } from './report.js';
 import { recommendation } from './i18n.js';
@@ -40,7 +41,7 @@ function rulesView(rules,t,lang) {
 }
 export function richRunView(snapshot,filters,lang,base,run) {
   const t=words[lang],metrics=snapshotMetrics(snapshot),pages=selectEvidence(snapshot,filters);
-  const legacy=snapshot.historyVersion!==2||snapshot.pages.some(page=>page.status==='succeeded'&&page.report.incompleteDetails==null);
+  const legacy=!(snapshot.historyVersion>=2)||snapshot.pages.some(page=>page.status==='succeeded'&&page.report.incompleteDetails==null);
   const cards=[...Object.entries(metrics.pages),['rules',metrics.rules],['elements',metrics.elements],['reviewRules',metrics.review??t.unknown],...Object.entries(metrics.severity)];
   const summary=`<h2>${t.summary}</h2><p>${t.note} ${metrics.complete===true?t.complete:t.partial}</p>${legacy?`<p class="notice">${t.legacy}</p>`:''}
     <div class="grid">${cards.map(([key,n])=>`<div class="metric"><strong>${escape(n)}</strong>${t[key]}</div>`).join('')}</div>`;
@@ -48,7 +49,7 @@ export function richRunView(snapshot,filters,lang,base,run) {
     ${page.status!=='succeeded'?`<p>${t.noAudit}</p>`:`<p>${escape(page.report.engine?`${page.report.engine.name} ${page.report.engine.version}`:t.unknown)}</p>
       <h3>${t.violations}</h3>${rulesView(page.report.violations,t,lang)}
       <h3>${t.review}</h3>${page.report.incompleteDetails==null?`<p>${t.unknownReview}</p>`:rulesView(page.report.incompleteDetails,t,lang)}`}</details>`).join('');
-  return filterForm(base,run,lang,filters,t)+summary+`<h2>${t.violations} / ${t.review}</h2>`+(body||`<p>${t.none}</p>`);
+  return filterForm(base,run,lang,filters,t)+summary+manualReviewHTML(snapshot,lang,{limited:true})+`<h2>${t.violations} / ${t.review}</h2>`+(body||`<p>${t.none}</p>`);
 }
 export function historyTrendView(window,lang,base) {
   const t=words[lang];

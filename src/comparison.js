@@ -1,3 +1,4 @@
+import { validateManualReviews } from './manual-review.js';
 import { validateJourney, sameJourney } from './journey.js';
 import { open } from 'node:fs/promises';
 import { normalizeUrl, validateProject } from './project.js';
@@ -16,8 +17,9 @@ function target(value, depth = 0) {
 }
 export function validateSnapshot(input) {
   if (!input || input.schemaVersion !== 1 || input.kind !== 'project-audit') throw new Error('Expected project-audit snapshot schemaVersion 1');
-  if(input.historyVersion!==undefined&&![1,2].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
-  const rich=input.historyVersion===2;
+  if(input.historyVersion!==undefined&&![1,2,3].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
+  const rich=input.historyVersion>=2;
+  if(input.manualReviews!==undefined&&input.historyVersion!==3) throw new Error('Manual evidence requires historyVersion 3');
   const project=validateProject(input.project);
   const profiles=project.viewports??[null],count=profiles.length*(project.journeys?.length??1);
   if (!Array.isArray(input.pages) || (project.crawl ? input.pages.length<project.urls.length*count||input.pages.length>project.crawl.maxPages*count : input.pages.length!==project.urls.length*count)) throw new Error('Invalid snapshot page count');
@@ -74,12 +76,17 @@ export function validateSnapshot(input) {
   }
   const tool=rich&&input.tool!=null?text(input.tool,128,'tool'):null;
   const version=rich&&input.version!=null?text(input.version,128,'version'):null;
-  return {schemaVersion:1,kind:'project-audit',...(rich?{historyVersion:2,generatedAt,coverageComplete,tool,version}:{}),project,pages};
+  const snapshot={schemaVersion:1,kind:'project-audit',...(rich?{historyVersion:2,generatedAt,coverageComplete,tool,version}:{}),project,pages};
+  if(input.historyVersion===3) {
+    snapshot.manualReviews=validateManualReviews(input.manualReviews,snapshot);
+    snapshot.historyVersion=3;
+  }
+  return snapshot;
 }
 // Additive conversion: never invent missing metadata or rewrite the original record.
 export function upgradeSnapshot(input) {
-  if(input?.historyVersion!==undefined&&![1,2].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
-  return validateSnapshot({...input,historyVersion:2});
+  if(input?.historyVersion!==undefined&&![1,2,3].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
+  return validateSnapshot({...input,historyVersion:input.historyVersion===3?3:2});
 }
 export async function loadSnapshot(path, {enrich=false}={}) {
   const file=await open(path,'r');
