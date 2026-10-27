@@ -55,18 +55,24 @@ function reportFromWorker(report,job,imageId,mediator) {
 }
 
 // Internal opt-in API. Docker is never auto-installed or pulled, and the existing CLI is unchanged.
-export async function auditPageInDocker(url,{imageId,signal,...options}={}, {execute=run,spawnWorker=spawn,createMediator=createRequestMediator}={}) {
+export async function auditPageInDocker(url,{imageId,signal,...options}={}, {execute=run,spawnWorker=spawn,createMediator=createRequestMediator,lifecycle}={}) {
+  if(lifecycle!==undefined && (typeof lifecycle?.reserve!=='function'||typeof lifecycle?.release!=='function'))throw new Error('Invalid trusted worker lifecycle');
   immutableImage(imageId);const job=validateJob({url,...options});signal?.throwIfAborted();
   const profileSource=await readFile(seccompPath);if(createHash('sha256').update(profileSource).digest('hex')!==seccompHash)throw new Error('Worker seccomp profile changed');
   const profile=JSON.parse(profileSource),owner=randomUUID(),name=`accesspilot-worker-${randomUUID()}`,controller=new AbortController();
   const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();
   const timer=setTimeout(cancel,job.timeoutMs+30000);
-  let created=false,cleanupFailed=false,containerId,child,mediator,result,failure;
+  let reserved=false,created=false,cleanupFailed=false,containerId,child,mediator,result,failure;
   const docker=async args=>(await execute('docker',args,{timeout:30000,maxBuffer:256*1024,windowsHide:true,shell:false})).stdout.trim();
   try {
     const info=JSON.parse(await docker(['info','--format','{{json .}}']));controller.signal.throwIfAborted();
     if(info.OSType!=='linux')throw new Error('Linux Docker engine required');
     const apparmor=info.SecurityOptions?.some(value=>value==='name=apparmor')??false;
+    if(lifecycle) {
+      try {await lifecycle.reserve({name,owner,imageId,engineId:info.ID});reserved=true;}
+      catch(error) {cleanupFailed=true;throw error;}
+    }
+    controller.signal.throwIfAborted();
     created=true;containerId=await docker(workerArguments(imageId,name,owner,{apparmor}));
     if(!/^[a-f0-9]{64}$/.test(containerId))throw new Error('Invalid worker container ID');
     controller.signal.throwIfAborted();
@@ -127,9 +133,13 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
     if(created) {
       try {
         const owned=JSON.parse(await docker(['inspect',name]));
-        if(owned.length!==1||owned[0].Config?.Labels?.['org.accesspilot.worker']!==owner||!/^[a-f0-9]{64}$/.test(owned[0].Id))throw new Error('Worker cleanup ownership unverified');
+        if(owned.length!==1||owned[0].Config?.Labels?.['org.accesspilot.worker']!==owner||owned[0].Config?.Image!==imageId||containerId&&owned[0].Id!==containerId||!/^[a-f0-9]{64}$/.test(owned[0].Id))throw new Error('Worker cleanup ownership unverified');
         await docker(['rm','--force','--volumes',owned[0].Id]);
       } catch {cleanupFailed=true;failure=new Error('Contained audit failed: owned container cleanup could not be verified');}
+    }
+    if(reserved&&!cleanupFailed) {
+      try {await lifecycle.release();}
+      catch {cleanupFailed=true;failure=new Error('Worker ownership intent could not be released');}
     }
   }
   if(failure) {

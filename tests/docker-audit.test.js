@@ -54,12 +54,12 @@ test('pre-cancelled worker never invokes Docker',async()=>{
   const controller=new AbortController();controller.abort();await assert.rejects(auditPageInDocker('https://example.org',{imageId,signal:controller.signal},{execute:()=>assert.fail('must not execute')}));
 });
 
-async function supervisorFixture(mode) {
+async function supervisorFixture(mode,{lifecycle}={}) {
   let owner,removed=false,spawned=false;
   const execute=async(command,args)=>{
-    if(args[0]==='info')return {stdout:JSON.stringify({OSType:'linux',SecurityOptions:[]})};
+    if(args[0]==='info')return {stdout:JSON.stringify({ID:'fixture-engine',OSType:'linux',SecurityOptions:[]})};
     if(args[0]==='create'){owner=args[args.indexOf('--label')+1].split('=')[1];return {stdout:id};}
-    if(args[0]==='inspect') {const c=container(owner);if(mode==='inspection')c.HostConfig.NetworkMode='host';if(mode==='cleanup'&&args[1].startsWith('accesspilot-worker-'))c.Config.Labels['org.accesspilot.worker']='someone-else';return {stdout:JSON.stringify([c])};}
+    if(args[0]==='inspect') {const c=container(owner);if(mode==='inspection')c.HostConfig.NetworkMode='host';if(mode==='oom')c.State.OOMKilled=true;if(mode==='cleanup'&&args[1].startsWith('accesspilot-worker-'))c.Config.Labels['org.accesspilot.worker']='someone-else';return {stdout:JSON.stringify([c])};}
     if(args[0]==='rm'){assert.equal(args.at(-1),id);removed=true;return {stdout:id};}
     throw new Error('Unexpected Docker command');
   };
@@ -81,11 +81,11 @@ async function supervisorFixture(mode) {
     return child;
   };
   let result;
-  if(mode==='success')result=await auditPageInDocker('https://example.org',{imageId},{execute,spawnWorker});
+  if(mode==='success')result=await auditPageInDocker('https://example.org',{imageId},{execute,spawnWorker,lifecycle});
   else await assert.rejects(auditPageInDocker('https://example.org',{imageId},{execute,spawnWorker}),/Contained audit failed/);
   assert.equal(removed,mode!=='cleanup');assert.equal(spawned,mode!=='inspection');return result;
 }
-for(const mode of ['success','inspection','sequence','cleanup'])test(`mocked supervisor ${mode} checks completion and owned cleanup (not Docker evidence)`,async()=>{
+for(const mode of ['success','inspection','sequence','cleanup','oom'])test(`mocked supervisor ${mode} checks completion and owned cleanup (not Docker evidence)`,async()=>{
   const result=await supervisorFixture(mode);if(result)assert.equal(result.isolation.imageId,imageId);
 });
 
@@ -95,4 +95,28 @@ test('worker inspection rejects injected proxy credentials or Node startup hooks
     const c=container(owner);c.Config.Env=c.Config.Env.filter(item=>!item.startsWith(name+'=')).concat(name+'='+value);
     assert.throws(()=>verifyWorker(c,imageId,owner,profile),error=>!error.message.includes('fixture-secret')&&/environment/.test(error.message));
   }
+});
+
+test('trusted lifecycle reserves before start and releases after verified cleanup',async()=>{
+  let reserved=false,released=false;
+  await supervisorFixture('success',{lifecycle:{
+    reserve:async claim=>{assert.equal(claim.engineId,'fixture-engine');assert.equal(claim.imageId,imageId);assert.match(claim.name,/^accesspilot-worker-/);reserved=true;},
+    release:async()=>{assert.equal(reserved,true);released=true;}
+  }});
+  assert.equal(released,true);
+});
+
+test('failed durable reserve never creates a container and signals unsafe lifecycle',async()=>{
+  const calls=[];
+  await assert.rejects(auditPageInDocker('https://example.org',{imageId},{
+    execute:async(_command,args)=>{calls.push(args[0]);assert.equal(args[0],'info');return {stdout:JSON.stringify({ID:'fixture-engine',OSType:'linux'})};},
+    lifecycle:{reserve:async()=>{throw new Error('disk failure');},release:()=>assert.fail('failed intent released')}
+  }),error=>error.code==='ACCESSPILOT_CLEANUP_UNVERIFIED');
+  assert.deepEqual(calls,['info']);
+});
+
+test('unverified cleanup never releases the ownership intent',async()=>{
+  let released=false;
+  await supervisorFixture('cleanup',{lifecycle:{reserve:async()=>{},release:async()=>{released=true;}}});
+  assert.equal(released,false);
 });

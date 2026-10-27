@@ -1,3 +1,4 @@
+import {createWorkerLedger} from './worker-ledger.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, lstat, readFile, open, rename, unlink, rmdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
@@ -12,13 +13,15 @@ function cancelled() { return new Error('Audit queue job cancelled'); }
 
 // One supervisor owns the directory. An abandoned lock is never stolen automatically.
 // Only opaque IDs and lifecycle states are persisted; task payloads/results stay in memory.
-export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2048, cpu = 2, maxQueued = 100} = {}) {
+export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2048, cpu = 2, maxQueued = 100, recovery = false} = {}) {
+  if (typeof recovery!=='boolean' || recovery && directory===undefined) throw new Error('Recovery requires a job-store directory');
   integer(maxWorkers, 1, 4, 'maxWorkers');
   integer(memoryMiB, 1024, 4096, 'memoryMiB');
   integer(cpu, 1, 4, 'cpu');
   integer(maxQueued, 1, 100, 'maxQueued');
   const capacity = Math.min(maxWorkers, Math.floor(memoryMiB / 1024), cpu);
   let ownsLock = false, closing, unsafeCleanup = false;
+  let ledger, recovering = false;
   let root, lock, records = [], closed = false, fatal = false, active = 0;
   let serial = Promise.resolve();
   const waiting = [], running = new Set(), idle = new Set();
@@ -67,6 +70,8 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
         }
         records = data.records.map(row => ({id: row.id, state: terminal.has(row.state) ? row.state : 'interrupted'}));
       } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      ledger=await createWorkerLedger(root);
+      if (ledger.size && !recovery) throw new Error('Unresolved worker intents; run offline worker recovery before auditing');
       await persist();
     }
   } catch (error) {
@@ -95,7 +100,7 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
     try {
       job.row.state = 'running'; await save();
       if (job.controller.signal.aborted) throw cancelled();
-      const result = await job.task(job.controller.signal);
+      const result = await job.task(job.controller.signal, {workerLifecycle:ledger?.lifecycle(job.row.id)});
       job.row.state = job.controller.signal.aborted ? 'cancelled' : 'succeeded';
       await save();
       if (job.controller.signal.aborted) job.reject(cancelled()); else job.resolve(result);
@@ -119,7 +124,7 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
     submit(task, {signal} = {}) {
       if (signal !== undefined && !(signal instanceof AbortSignal)) return Promise.reject(new Error('Expected an AbortSignal'));
       if (typeof task !== 'function') return Promise.reject(new Error('Expected an audit task'));
-      if (closed || fatal) return Promise.reject(new Error('Audit queue is closed or failed'));
+      if (recovery || closed || fatal) return Promise.reject(new Error('Audit queue is closed or failed'));
       if (signal?.aborted) return Promise.reject(cancelled());
       if (waiting.length >= maxQueued) return Promise.reject(new Error('Audit queue is full'));
       // Bounded journal; remove only terminal entries, never live work.
@@ -154,8 +159,16 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
         });
       });
     },
+    async recoverWorkers(options={}) {
+      if (!recovery || closed || recovering) throw new Error('Worker recovery requires an idle offline supervisor');
+      recovering = true;
+      try {return await ledger.recover(options);}
+      catch (error) {if(options.apply)unsafeCleanup=true;throw error;}
+      finally {recovering=false;}
+    },
     close() {
       if (closing) return closing;
+      if(recovering)return Promise.reject(new Error('Worker recovery is still active'));
       closing = (async () => {
       closed = true;
       for (const job of waiting.splice(0)) { job.row.state = 'cancelled'; job.dispose(); job.reject(cancelled()); }
