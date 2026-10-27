@@ -14,7 +14,7 @@ import {compareAudits,validateSnapshot} from '../src/comparison.js';
 
 const imageId='sha256:'+'a'.repeat(64),id='b'.repeat(64),profile=JSON.parse(await readFile(new URL('../worker/seccomp-profile.json',import.meta.url)));
 function container(owner) {
-  return {Id:id,Config:{Image:imageId,User:'65534:65534',OpenStdin:true,Tty:false,Entrypoint:['node'],Cmd:['/app/worker/entry.js'],Labels:{'org.accesspilot.worker':owner}},HostConfig:{
+  return {Id:id,Config:{Image:imageId,User:'65534:65534',OpenStdin:true,Tty:false,Env:['NODE_OPTIONS=','NODE_PATH=','HTTP_PROXY=','HTTPS_PROXY=','ALL_PROXY=','NO_PROXY=','http_proxy=','https_proxy=','all_proxy=','no_proxy='],Entrypoint:['node'],Cmd:['/app/worker/entry.js'],Labels:{'org.accesspilot.worker':owner}},HostConfig:{
     NetworkMode:'none',ReadonlyRootfs:true,Privileged:false,Memory:1073741824,MemorySwap:1073741824,NanoCpus:1000000000,PidsLimit:256,IpcMode:'private',ShmSize:268435456,CgroupnsMode:'private',Init:true,
     LogConfig:{Type:'none'},CapDrop:['ALL'],SecurityOpt:['no-new-privileges','seccomp='+JSON.stringify(profile)],Tmpfs:{'/tmp':'rw,noexec,nosuid,nodev,size=536870912,mode=1777'}},State:{Running:false,ExitCode:0,OOMKilled:false}};
 }
@@ -87,4 +87,12 @@ async function supervisorFixture(mode) {
 }
 for(const mode of ['success','inspection','sequence','cleanup'])test(`mocked supervisor ${mode} checks completion and owned cleanup (not Docker evidence)`,async()=>{
   const result=await supervisorFixture(mode);if(result)assert.equal(result.isolation.imageId,imageId);
+});
+
+
+test('worker inspection rejects injected proxy credentials or Node startup hooks without echoing secrets',()=>{
+  const owner=randomUUID();for(const [name,value] of [['HTTP_PROXY','https://user:fixture-secret@proxy.invalid'],['NODE_OPTIONS','--import=/host/hook.js']]) {
+    const c=container(owner);c.Config.Env=c.Config.Env.filter(item=>!item.startsWith(name+'=')).concat(name+'='+value);
+    assert.throws(()=>verifyWorker(c,imageId,owner,profile),error=>!error.message.includes('fixture-secret')&&/environment/.test(error.message));
+  }
 });

@@ -10,6 +10,7 @@ import {validateSnapshot} from './comparison.js';
 import {createRequestMediator} from './request-mediator.js';
 import {messages} from './i18n.js';
 
+const clearedEnv=['NODE_OPTIONS','NODE_PATH','HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy'];
 const run=promisify(execFile),seccompPath=fileURLToPath(new URL('../worker/seccomp-profile.json',import.meta.url));
 const seccompHash='6608d052c6b359c09b33be7b8f611dc3be09893d5e6f6a20248f83acb330883e';
 export function workerArguments(imageId,name,owner,{apparmor=false}={}) {
@@ -19,11 +20,13 @@ export function workerArguments(imageId,name,owner,{apparmor=false}={}) {
     '--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--security-opt',`seccomp=${seccompPath}`,
     ...(apparmor?['--security-opt','apparmor=accesspilot-worker']:[]),'--user','65534:65534','--pids-limit','256','--memory','1g','--memory-swap','1g',
     '--cpus','1','--ipc','private','--shm-size','256m','--cgroupns','private','--log-driver','none',
-    '--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=536870912,mode=1777','--env','HOME=/tmp','--env','NODE_OPTIONS=','--env','NODE_PATH=',
+    '--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=536870912,mode=1777','--env','HOME=/tmp',...clearedEnv.flatMap(name=>['--env',name+'=']),
     '--entrypoint','node',imageId,'/app/worker/entry.js'];
 }
 export function verifyWorker(container,imageId,owner,profile,{apparmor=false}={}) {
   const h=container.HostConfig,c=container.Config;
+  const env=c?.Env??[];
+  if(!Array.isArray(env)||clearedEnv.some(name=>env.filter(value=>typeof value==='string'&&value.startsWith(name+'=')).length!==1||!env.includes(name+'=')))throw new Error('Worker environment did not match required profile');
   const security=h?.SecurityOpt??[],seccomp=security.find(value=>value.startsWith('seccomp='));
   if(!c||!h||c.Image!==imageId||c.Labels?.['org.accesspilot.worker']!==owner||c.User!=='65534:65534'||c.Tty!==false||c.OpenStdin!==true||JSON.stringify(c.Entrypoint)!=='["node"]'||JSON.stringify(c.Cmd)!=='["/app/worker/entry.js"]'||
     h.NetworkMode!=='none'||h.ReadonlyRootfs!==true||h.Privileged!==false||h.Memory!==1073741824||h.MemorySwap!==1073741824||h.NanoCpus!==1000000000||h.PidsLimit!==256||
@@ -52,7 +55,7 @@ function reportFromWorker(report,job,imageId,mediator) {
 }
 
 // Internal opt-in API. Docker is never auto-installed or pulled, and the existing CLI is unchanged.
-export async function auditPageInDocker(url,{imageId,signal,...options}={}, {execute=run,spawnWorker=spawn}={}) {
+export async function auditPageInDocker(url,{imageId,signal,...options}={}, {execute=run,spawnWorker=spawn,createMediator=createRequestMediator}={}) {
   immutableImage(imageId);const job=validateJob({url,...options});signal?.throwIfAborted();
   const profileSource=await readFile(seccompPath);if(createHash('sha256').update(profileSource).digest('hex')!==seccompHash)throw new Error('Worker seccomp profile changed');
   const profile=JSON.parse(profileSource),owner=randomUUID(),name=`accesspilot-worker-${randomUUID()}`,controller=new AbortController();
@@ -69,7 +72,7 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
     controller.signal.throwIfAborted();
     const inspection=JSON.parse(await docker(['inspect',containerId]));if(inspection.length!==1)throw new Error('Invalid worker inspection');
     verifyWorker(inspection[0],imageId,owner,profile,{apparmor});controller.signal.throwIfAborted();
-    mediator=createRequestMediator(job.scopeUrls,job.network,{signal:controller.signal,maxDurationMs:job.timeoutMs+Math.min(30000,120000-job.timeoutMs),
+    mediator=createMediator(job.scopeUrls,job.network,{signal:controller.signal,maxDurationMs:job.timeoutMs+Math.min(30000,120000-job.timeoutMs),
       timeoutMs:Math.min(job.timeoutMs,10000),maxRequests:job.crawl?.maxRequestsPerPage,maxBytes:job.crawl?.maxBytesPerPage,maxRedirects:job.crawl?.maxRedirects});
     await new Promise((resolve,reject)=>{
       let phase='ready',lastId=0,inFlight=0,stderrBytes=0,accepted,settled=false;
