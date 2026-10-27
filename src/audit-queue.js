@@ -1,3 +1,4 @@
+import {createResourceDomain,hasResourceLease} from './resource-domain.js';
 import {createWorkerLedger} from './worker-ledger.js';
 import { randomUUID } from 'node:crypto';
 import { mkdir, lstat, readFile, open, rename, unlink, rmdir } from 'node:fs/promises';
@@ -13,15 +14,16 @@ function cancelled() { return new Error('Audit queue job cancelled'); }
 
 // One supervisor owns the directory. An abandoned lock is never stolen automatically.
 // Only opaque IDs and lifecycle states are persisted; task payloads/results stay in memory.
-export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2048, cpu = 2, maxQueued = 100, recovery = false} = {}) {
+export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2048, cpu = 2, maxQueued = 100, recovery = false, resourceDirectory} = {}) {
   if (typeof recovery!=='boolean' || recovery && directory===undefined) throw new Error('Recovery requires a job-store directory');
   integer(maxWorkers, 1, 4, 'maxWorkers');
   integer(memoryMiB, 1024, 4096, 'memoryMiB');
   integer(cpu, 1, 4, 'cpu');
   integer(maxQueued, 1, 100, 'maxQueued');
-  const capacity = Math.min(maxWorkers, Math.floor(memoryMiB / 1024), cpu);
+  if(resourceDirectory!==undefined&&directory===undefined)throw new Error('Shared resources require a job-store directory');
+  const capacity = Math.min(maxWorkers, Math.floor(memoryMiB / 1024), cpu, resourceDirectory===undefined?4:2);
   let ownsLock = false, closing, unsafeCleanup = false;
-  let ledger, recovering = false;
+  let ledger, resourceDomain, recovering = false;
   let root, lock, records = [], closed = false, fatal = false, active = 0;
   let serial = Promise.resolve();
   const waiting = [], running = new Set(), idle = new Set();
@@ -70,13 +72,15 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
         }
         records = data.records.map(row => ({id: row.id, state: terminal.has(row.state) ? row.state : 'interrupted'}));
       } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if(resourceDirectory===undefined&&await hasResourceLease(root))throw new Error('Resource lease exists; provide its --resource-store for offline recovery');
       ledger=await createWorkerLedger(root);
       if (ledger.size && !recovery) throw new Error('Unresolved worker intents; run offline worker recovery before auditing');
       await persist();
+      if(resourceDirectory!==undefined)resourceDomain=await createResourceDomain(root,resourceDirectory,{recovery});
     }
   } catch (error) {
     // Remove only the lock acquired by this invocation.
-    if (ownsLock) {
+    if (ownsLock && error.code!=='ACCESSPILOT_RESOURCE_UNVERIFIED') {
       await rmdir(lock).catch(() => {});
     }
     throw error;
@@ -162,7 +166,12 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
     async recoverWorkers(options={}) {
       if (!recovery || closed || recovering) throw new Error('Worker recovery requires an idle offline supervisor');
       recovering = true;
-      try {return await ledger.recover(options);}
+      try {
+        const reservation=resourceDomain?await resourceDomain.inspect():undefined;
+        const result=await ledger.recover(options);
+        if(options.apply&&resourceDomain)await resourceDomain.release();
+        return {...result,...(reservation?{resourceReservation:{...reservation,released:options.apply===true}}:{})};
+      }
       catch (error) {if(options.apply)unsafeCleanup=true;throw error;}
       finally {recovering=false;}
     },
@@ -175,7 +184,14 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
       for (const job of running) job.controller.abort();
       if (active) await new Promise(resolve => idle.add(resolve));
       await serial;
-      try { await persist(); } finally { if (lock && !unsafeCleanup) await rmdir(lock); }
+      if(resourceDomain&&!recovery&&ledger.size)unsafeCleanup=true;
+      try {await persist();}
+      finally {
+        if(resourceDomain&&!recovery&&!unsafeCleanup) {
+          try {await resourceDomain.release();}catch {unsafeCleanup=true;}
+        }
+        if(lock&&!unsafeCleanup)await rmdir(lock);
+      }
       if (unsafeCleanup) throw new Error('Unverified container cleanup; operator recovery required');
       })();
       return closing;
