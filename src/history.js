@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, open, rename, unlink, readdir, lstat, rmdir } from 'node:fs/promises';
-import { setTimeout as delay } from 'node:timers/promises';
+import {acquireDirectoryLock} from './directory-lock.js';
 import { join, resolve } from 'node:path';
 import { validateProject } from './project.js';
 import { upgradeSnapshot, loadSnapshot } from './comparison.js';
@@ -22,15 +22,7 @@ async function directory(root, project) {
 async function locked(root, project, action) {
   const path = await directory(root, project);
   const lock = join(path, '.history-lock');
-  const deadline = Date.now() + 5000;
-  while (true) {
-    try { await mkdir(lock, {mode:0o700}); break; }
-    catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      if (Date.now() >= deadline) throw new Error('History is busy or has an abandoned .history-lock; stop other history processes before removing the lock');
-      await delay(25);
-    }
-  }
+  await acquireDirectoryLock(lock);
   try { return await action(path); }
   finally { await rmdir(lock); }
 }
