@@ -11,7 +11,7 @@ import {createRequestMediator} from './request-mediator.js';
 import {messages} from './i18n.js';
 
 const run=promisify(execFile),seccompPath=fileURLToPath(new URL('../worker/seccomp-profile.json',import.meta.url));
-const seccompHash='cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849';
+const seccompHash='6608d052c6b359c09b33be7b8f611dc3be09893d5e6f6a20248f83acb330883e';
 export function workerArguments(imageId,name,owner,{apparmor=false}={}) {
   immutableImage(imageId);
   if(!/^accesspilot-worker-[a-f0-9-]{36}$/.test(name)||!/^[a-f0-9-]{36}$/.test(owner))throw new Error('Invalid worker ownership');
@@ -80,9 +80,9 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
         if(settled)throw new Error('Worker channel finished');
         if(value?.type==='ready') {
           fields(value,['type','proof']);if(phase!=='ready')throw new Error('Duplicate worker readiness');
-          fields(value.proof,['profileVersion','uid','networkNone','seccomp','noNewPrivileges','kernelLimits','directTcpUdpDenied','readOnly','noExecTmp']);
+          fields(value.proof,['profileVersion','uid','networkNone','seccomp','noNewPrivileges','kernelLimits','directTcpUdpDenied','readOnly','noExecTmp','parentChrootDenied']);
           if(value.proof.profileVersion!==1||value.proof.uid!==65534||Object.entries(value.proof).some(([key,item])=>!['profileVersion','uid'].includes(key)&&item!==true))throw new Error('Invalid worker proof');
-          if(Object.keys(value.proof).length!==9)throw new Error('Incomplete worker proof');
+          if(Object.keys(value.proof).length!==10)throw new Error('Incomplete worker proof');
           phase='sandbox';send(child.stdin,{type:'start',job}).catch(stop);return;
         }
         if(value?.type==='sandbox') {

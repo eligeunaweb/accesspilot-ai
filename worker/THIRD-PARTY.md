@@ -1,9 +1,14 @@
 # Third-party notices
 
-`seccomp-profile.json` is copied unchanged from Microsoft Playwright v1.64.1,
+`seccomp-profile.json` derives from Microsoft Playwright v1.64.1,
 https://github.com/microsoft/playwright/blob/v1.64.1/utils/docker/seccomp_profile.json .
 Copyright Microsoft Corporation; Apache License 2.0, reproduced in LICENSE-APACHE-2.0.
-SHA-256: cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849.
+Upstream SHA-256: cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849.
+Local SHA-256: 6608d052c6b359c09b33be7b8f611dc3be09893d5e6f6a20248f83acb330883e.
+Local change: allow chroot alongside namespace syscalls so Chromium can chroot
+inside its own user namespace even with all container capabilities dropped.
+The kernel still requires CAP_SYS_CHROOT in the calling user namespace; the
+worker guard verifies that the parent process remains unable to chroot.
 It permits Chromium namespace syscalls on top of the upstream Docker profile.
 
 `apparmor.profile` derives from Moby v28.0.0 profiles/apparmor/template.go,

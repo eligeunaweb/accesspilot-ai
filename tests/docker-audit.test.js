@@ -77,7 +77,7 @@ async function supervisorFixture(mode) {
       }
     });
     child.stdin=new Writable({write(chunk,encoding,callback){try{reader.push(chunk);callback();}catch(error){callback(error);}}});
-    setImmediate(()=>emit({type:'ready',proof:{profileVersion:1,uid:65534,networkNone:true,seccomp:true,noNewPrivileges:true,kernelLimits:true,directTcpUdpDenied:true,readOnly:true,noExecTmp:true}}));
+    setImmediate(()=>emit({type:'ready',proof:{profileVersion:1,uid:65534,networkNone:true,seccomp:true,noNewPrivileges:true,kernelLimits:true,directTcpUdpDenied:true,readOnly:true,noExecTmp:true,parentChrootDenied:true}}));
     return child;
   };
   let result;

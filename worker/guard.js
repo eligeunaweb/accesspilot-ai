@@ -10,7 +10,7 @@ export async function guard() {
   const read=async path=>(await readFile(path,'utf8')).trim();
   assert.equal(process.platform,'linux');assert.equal(process.getuid(),65534);
   assert.deepEqual(Object.keys(networkInterfaces()).sort(),['lo']);
-  const status=await read('/proc/self/status');assert.match(status,/^CapEff:\s+0+$/m);assert.match(status,/^NoNewPrivs:\s+1$/m);assert.match(status,/^Seccomp:\s+2$/m);
+  const status=await read('/proc/self/status');assert.match(status,/^CapEff:\s+0+$/m);assert.match(status,/^CapBnd:\s+0+$/m);assert.match(status,/^NoNewPrivs:\s+1$/m);assert.match(status,/^Seccomp:\s+2$/m);
   assert.equal(await read('/sys/fs/cgroup/memory.max'),'1073741824');assert.equal(await read('/sys/fs/cgroup/memory.swap.max'),'0');
   assert.equal(await read('/sys/fs/cgroup/pids.max'),'256');
   const [quota,period]=(await read('/sys/fs/cgroup/cpu.max')).split(/\s+/).map(Number);assert.equal(quota/period,1);
@@ -27,5 +27,6 @@ export async function guard() {
   await assert.rejects(readFile('/var/run/docker.sock'),error=>error.code==='ENOENT');
   await writeFile('/tmp/accesspilot-noexec.sh','#!/bin/sh\nexit 0\n',{mode:0o700});
   await assert.rejects(promisify(execFile)('/tmp/accesspilot-noexec.sh'),error=>error.code==='EACCES');
-  return {profileVersion:1,uid:65534,networkNone:true,seccomp:true,noNewPrivileges:true,kernelLimits:true,directTcpUdpDenied:true,readOnly:true,noExecTmp:true};
+  await assert.rejects(promisify(execFile)('chroot',['/tmp','/bin/true'],{env:{...process.env,LC_ALL:'C'}}),error=>error.code===1&&/Operation not permitted/.test(error.stderr));
+  return {parentChrootDenied:true,profileVersion:1,uid:65534,networkNone:true,seccomp:true,noNewPrivileges:true,kernelLimits:true,directTcpUdpDenied:true,readOnly:true,noExecTmp:true};
 }
