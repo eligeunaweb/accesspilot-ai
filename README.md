@@ -224,3 +224,5 @@ privacy, storage guarantees and remaining limitations.
 Authenticated sessions / Sesiones autenticadas: [guide](docs/AUTHENTICATED-SESSIONS.md).
 
 Interactive journeys / Recorridos interactivos: [guide](docs/INTERACTIVE-JOURNEYS.md).
+
+Manual review evidence / Evidencias de revisión manual: [guide](docs/MANUAL-REVIEW.md).

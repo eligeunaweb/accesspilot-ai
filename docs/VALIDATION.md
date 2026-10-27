@@ -272,3 +272,18 @@ Local execution uses the documented test-only outer-sandbox adapter, workspace b
 208 pruebas aprobadas. Los puntos reproducen sus pasos desde un contexto nuevo y no comparten mutaciones entre puntos; las sesiones son opcionales. Las teclas dirigidas a un selector no prueban accesibilidad completa por teclado. No se han fusionado cambios ni publicado releases o despliegues.
 
 Current npm audit --json: zero known vulnerabilities; transcript npm-audit-journeys.json in task outputs.
+
+
+## Manual evidence / Evidencia manual — 2026-10-27
+
+- Final full suite: 216 passed, zero failures/cancellations/skips; 31.680 seconds, Windows / Node 24.11.1. Transcript: tests-manual-release-check.txt in task outputs.
+- Eight new tests validate canonical fingerprints, v3 evidence round trips and legacy reading, strict schemas, scope/chronology/status/method/reference limits, no false automated resolutions, append-only declarations, HTML escaping and CSV formula defenses.
+- Real CLI subprocesses generate templates, refuse overwrites, append a history record and reject cross-project imports with the browser path deliberately unavailable, demonstrating that these offline operations do not launch Chromium. Source files and older records remain unchanged.
+- Real protected viewer checks manual content, bilingual axe and JSON/HTML/CSV downloads. Test declarations are synthetic software fixtures, not human accessibility assessments. Local tests use the documented test-only outer-sandbox adapter and workspace cache/temp paths.
+- Initial viewer attempt was blocked by the execution environment's loopback network policy; network permission was granted. A subsequent test-harness issue used Playwright browser.newPage(), incompatible with axe's extra-page requirements; changed to explicit browser.newContext(). The complete suite then passed. No application fallback or network weakening was introduced.
+- The preceding journey head 2dd7fbb passed all six native Windows/Linux/macOS x Node 22/24 jobs: https://github.com/eligeunaweb/accesspilot-ai/actions/runs/40390653867 . Native CI for the new manual-evidence head remains pending; the previous result does not validate it.
+- No dependencies added. External/manual acceptance remains unexecuted: real human reviews, assistive-technology/user testing, graphical evidence editing, secure attachments, digital signatures, cross-audit manual comparison, independent security review and OS containment. A fingerprint is not an identity proof or signature.
+
+216 pruebas aprobadas. Las declaraciones manuales no modifican resultados automáticos ni certifican conformidad. No se han realizado fusiones, releases ni despliegues.
+
+Final manual-evidence checks include expanded bilingual details passing axe, a bounded 5-batch/20-check/500-character viewer and full exports retaining all declarations. npm audit --json returned zero known vulnerabilities; no dependencies added. git diff --check passed.
