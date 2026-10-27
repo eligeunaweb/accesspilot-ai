@@ -226,3 +226,5 @@ Authenticated sessions / Sesiones autenticadas: [guide](docs/AUTHENTICATED-SESSI
 Interactive journeys / Recorridos interactivos: [guide](docs/INTERACTIVE-JOURNEYS.md).
 
 Manual review evidence / Evidencias de revisión manual: [guide](docs/MANUAL-REVIEW.md).
+
+Security boundary / Frontera de seguridad: [acceptance and limits](docs/SECURITY-BOUNDARY.md).

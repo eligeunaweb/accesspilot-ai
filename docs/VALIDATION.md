@@ -287,3 +287,17 @@ Current npm audit --json: zero known vulnerabilities; transcript npm-audit-journ
 216 pruebas aprobadas. Las declaraciones manuales no modifican resultados automáticos ni certifican conformidad. No se han realizado fusiones, releases ni despliegues.
 
 Final manual-evidence checks include expanded bilingual details passing axe, a bounded 5-batch/20-check/500-character viewer and full exports retaining all declarations. npm audit --json returned zero known vulnerabilities; no dependencies added. git diff --check passed.
+
+
+## Transport v2 and isolation prerequisites / Transporte v2 y requisitos de aislamiento — 2026-10-27
+
+- Full local suite: 227 passed, zero failures/cancellations/skips; 35.377 seconds on Windows / Node 24.11.1. Transcript: tests-egress-v2-full.txt in task outputs.
+- Eleven new tests cover bounded DNS sets/families/timeouts/cancellation/late answers; permanent request/transfer/deadline exhaustion; shared HTTP/CONNECT admission; active slow-response deadlines; invalid budgets; containment profile rejection and cleanup/exit failure handling. Transport fixtures make actual local requests and verify forbidden later requests never reach the target.
+- Real restricted-browser tests now require network.policyVersion 2. Existing history comparison logic rejects policy 1/2 mismatch. Native sandbox startup on this local Codex host remains unverified: local browser tests use the documented test-only outer-sandbox adapter.
+- npm audit --json: zero known vulnerabilities. No dependencies added. git diff --check passed.
+- The preceding manual-review head 88db3f9 passed all six native Windows/Linux/macOS x Node 22/24 jobs: https://github.com/eligeunaweb/accesspilot-ai/actions/runs/40483478814 . New per-head CI results must be checked independently; this phase adds a seventh Linux Docker isolation-prerequisite job.
+- Docker Desktop client exists. Initially the Linux engine pipe was missing; after the operator started Docker, the Codex execution host received named-pipe permission denied. The permission tool cannot represent that Windows channel. No Docker Desktop acceptance pass is claimed; no daemon TCP exposure or host permission/configuration changes were attempted.
+- The real Docker probe is separate from npm test: unit tests mock the Docker adapter to verify fail-closed orchestration, and CI executes the fixed Node payload in a real container. Inspect the workflow artifact for actual kernel/network/cgroup assertions and image ID; mocks are not containment evidence.
+- Still required before web audit jobs: contained Chromium with mediated egress, adversarial browser/host/LAN/DNS/UDP tests, trusted image policy, independent security review, service-level resource/job recovery controls and protected API. TLS CONNECT does not inspect encrypted HTTP methods; the browser still supplies that defense. The current viewer remains read-only.
+
+227 pruebas locales aprobadas. El aislamiento Node sin red es una prueba previa, no una implementación del navegador aislado ni una certificación de seguridad. No se han realizado fusiones, releases ni despliegues.
