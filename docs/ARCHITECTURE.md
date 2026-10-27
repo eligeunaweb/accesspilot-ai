@@ -46,3 +46,7 @@ SHARING-REPORTS.md documents an offline positive projection for sharing, exposed
 ## Explicit cross-process domain admission
 
 SHARED-RESOURCES.md adds optional shared-domain exclusion across CLI supervisors. One owner holds a fixed two-worker container budget through cleanup; uncertain shutdown retains the reservation for ownership-checked offline recovery. This supersedes the earlier missing cross-process coordination statement only for processes selecting the same explicit domain. Fair per-slot inter-process scheduling, automatic machine-wide limits and independent service review remain pending.
+
+## Local response admission and internal security review
+
+LOCAL-SERVICE-REVIEW.md records the internal review, existing boundaries and unresolved execution-service gates. The read-only viewer holds admission until handler and response completion, reserves pending report-body bytes and enforces frequency/absolute output deadlines plus strict HTTP framing/security headers. These are not total host heap/CPU guarantees or independent security approval. No web execution API is enabled.

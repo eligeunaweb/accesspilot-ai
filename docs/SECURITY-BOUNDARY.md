@@ -79,3 +79,7 @@ The operator supplied a passing Docker Desktop Node prerequisite, including clea
 ## Current experimental browser backend / Backend experimental actual
 
 The historical prerequisite-only status above is superseded for the opt-in project backend: see [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md). Default proxy audits remain policy 2. Docker audits use policy 3, mandatory namespace/PID/network/seccomp/TSYNC checks, zero container capabilities, network=none and bounded CDP/stdio HTTP mediation. The first successful Linux image/run is recorded in VALIDATION.md. This does not approve independent security, Docker Desktop Chromium, global job supervision or web execution. Retained old acceptance paragraphs describe their original Node/host-test scope.
+
+## Current local-service internal review
+
+See [LOCAL-SERVICE-REVIEW.md](LOCAL-SERVICE-REVIEW.md) for the reviewed boundaries, corrected response-lifetime admission, output/rate/deadline budgets and explicit open gates. Queue, ownership recovery and explicit shared-domain CLI admission are now implemented as documented in their guides; they do not enable a web job API or satisfy independent review. Historical pending statements above must be read with those later increments.

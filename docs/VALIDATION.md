@@ -384,3 +384,14 @@ Nine new tests passed, including actual child process ownership and SIGKILL, com
 ### macOS browser-test contention follow-up
 
 Run 40541018067 passed Windows/Linux Node 22/24, isolation prerequisite and both expanded real Docker acceptances (11 browser/CLI checks and 8 recovery checks). Both macOS Intel jobs failed because the existing multi-scenario E2E parent exceeded its unchanged 120-second deadline, cancelling/not starting later child scenarios. New resource-domain checks passed there. Failure logs are preserved in delivery outputs, not counted as success. To reduce competing browser processes, npm test now caps file concurrency at two across platforms, including manual Apple Silicon acceptance. No tests are skipped and the E2E deadline is not increased. Contention is the working diagnosis; actual corrected macOS reruns must validate it.
+
+
+## Internal local-service hardening — 2026-10-27
+
+The read-only viewer now keeps admission through handler completion and response finish/close, reserves UTF-8 report output, and rejects duplicate security/framing headers, unknown Fetch Metadata, GET payloads, Expect, CONNECT and Upgrade. No web execution API is enabled. See LOCAL-SERVICE-REVIEW.md for explicit budgets, threat model and open independent-review gates. No dependencies added.
+
+Local verification: 13 new tests plus the existing suite, **360/360 passed**, zero failed/cancelled/skipped, 54424.225 ms. Command: `node --import ./tests/helpers/outer-sandbox.js --test --test-timeout=120000 --test-concurrency=2`, with workspace TEMP and the existing test-only outer-sandbox adapter. The timeout is a diagnostic ceiling, not a changed production/test-script deadline. Separate viewer/sharing tests: 24/24; sessions: 6/6. Diff whitespace check passed.
+
+An initial full invocation stalled after runner tests and was interrupted; no failure was emitted and its cause remains unconfirmed. Isolated viewer/sharing/session runs and the bounded full repeat passed. Preserve that stall as unresolved evidence rather than claim it was fixed. Initial paused-client fixture assumptions about writableLength were corrected to a controlled throttled HTTP fixture; finish is not client acknowledgement. Current changes have not yet passed remote native CI or fresh Docker Desktop acceptance. Internal review does not satisfy independent security review, host heap/CPU isolation, Apple Silicon or human acceptance.
+
+Verificación local: **360 pruebas satisfactorias**, ninguna fallida/omitida; primera ejecución detenida e interrumpida, causa sin confirmar. No se declara validación remota ni revisión independiente.
