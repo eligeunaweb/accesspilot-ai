@@ -80,7 +80,11 @@ export async function main(args=process.argv.slice(2)) {
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const sessionState=opts['session-state']?await loadSessionState(opts['session-state'],project):undefined;
       if(opts['isolation-image']) queue=await createAuditQueue({directory:opts['job-store']});
-      const run = await auditProject(project, {signal:controller.signal,sessionState,...(opts['isolation-image']?{audit:(url,options)=>queue.submit(signal=>auditPageInDocker(url,{...options,signal,imageId:opts['isolation-image']}),{signal:options.signal})}:{})});
+      const audit=queue ? (url,options)=>queue.submit(
+        (signal,{workerLifecycle})=>auditPageInDocker(url,
+          {...options,signal,imageId:opts['isolation-image']},{lifecycle:workerLifecycle}),
+        {signal:options.signal}) : undefined;
+      const run = await auditProject(project, {signal:controller.signal,sessionState,...(audit?{audit}:{})});
       if (baseline) run.comparison = compareAudits(baseline, run);
       if (opts.history) { const id = await saveHistory(opts.history, run); console.error(`History saved: ${id}`); }
       const output = renderProject(run, opts.format);

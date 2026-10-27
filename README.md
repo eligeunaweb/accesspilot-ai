@@ -231,3 +231,5 @@ Security boundary / Frontera de seguridad: [acceptance and limits](docs/SECURITY
 
 
 Experimental contained Chromium / Chromium contenido experimental: build a reviewed local Docker worker image, resolve its immutable ID and select `--project project.json --isolation-image sha256:...`. Docker is optional for the existing CLI; the web viewer stays read-only. See the [bilingual operator and acceptance guide / guía bilingüe de operación y aceptación](docs/CONTAINED-BROWSER.md) for requirements, commands and remaining security/Desktop gates.
+
+Contained audit scheduling / Cola de auditorías: optional `--job-store .accesspilot-jobs` records private lifecycle and pre-create worker ownership. See [queue limits](docs/AUDIT-QUEUE.md) and [offline recovery / recuperación tras caídas](docs/WORKER-RECOVERY.md). Recovery previews are separate from explicit apply; abandoned locks are never stolen and jobs never replay automatically.

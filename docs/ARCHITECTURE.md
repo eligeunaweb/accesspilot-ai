@@ -34,3 +34,7 @@ See NETWORK-CRAWLING.md for actual implemented controls and the Windows nested-s
 ## Shared supervisor increment
 
 Contained CLI runs now use the FIFO supervisor documented in AUDIT-QUEUE.md. Optional private lifecycle journal, bounded admissions/reservations, cancellation through cleanup, exclusive ownership and interrupted-on-reopen semantics are implemented. This is a per-instance foundation; cross-process budgets, automatic orphan recovery and independent security review remain gates before an audit-execution UI.
+
+## Ownership recovery increment
+
+WORKER-RECOVERY.md describes immutable pre-create ownership intents, exact Docker engine/name/label/image/ID validation and offline recovery under the queue lock. Pending intents block auditing; preview is separate from apply, failed apply retains the lock, and jobs never replay. Automatic abandoned-lock takeover, cross-process scheduling, power-loss durability and independent security review remain pending.

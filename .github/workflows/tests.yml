@@ -76,9 +76,16 @@ jobs:
           image_id="$(docker image inspect accesspilot-worker:ci --format '{{.Id}}')"
           node scripts/contained-acceptance.js --image "$image_id" --output contained-result.json
         timeout-minutes: 7
+      - name: Recover killed supervisor and controlled OOM workers
+        run: |
+          image_id="$(docker image inspect accesspilot-worker:ci --format '{{.Id}}')"
+          node scripts/worker-recovery-acceptance.js --image "$image_id" --output worker-recovery-result.json
+        timeout-minutes: 5
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: contained-browser
-          path: contained-result.json
+          path: |
+            contained-result.json
+            worker-recovery-result.json
           if-no-files-found: ignore

@@ -27,3 +27,7 @@ Cancellation and shutdown preserve slots until cleanup finishes. Tasks must hono
 Unverified container cleanup is a fatal supervisor condition; pending tasks never launch and other active tasks are cancelled. An operator must investigate possible orphans before starting a new supervisor.
 
 If container cleanup is unverified, close fails and retains the persistent ownership lock for explicit operator investigation. / Si la limpieza es incierta, el cierre falla y conserva el bloqueo persistente hasta la intervención del operador.
+
+## Incremento de recuperación / Recovery increment
+
+See WORKER-RECOVERY.md for the new immutable ownership intents and offline preview/apply tool. The earlier statements above about missing verifiable associations describe the previous increment: current contained CLI audits with --job-store register ownership before create and support explicit offline recovery. Lock takeover remains manual after confirmed process termination; cross-process budgets remain pending.
