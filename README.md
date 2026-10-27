@@ -235,3 +235,5 @@ Experimental contained Chromium / Chromium contenido experimental: build a revie
 Contained audit scheduling / Cola de auditorías: optional `--job-store .accesspilot-jobs` records private lifecycle and pre-create worker ownership. See [queue limits](docs/AUDIT-QUEUE.md) and [offline recovery / recuperación tras caídas](docs/WORKER-RECOVERY.md). Recovery previews are separate from explicit apply; abandoned locks are never stolen and jobs never replay automatically.
 
 Reduced-data sharing / Resúmenes con datos reducidos: `--share-report audit.json --format html --lang es --output shared.html`, also available from the local viewer. See [privacy scope and limits / alcance y límites](docs/SHARING-REPORTS.md). Original evidence remains private and unchanged.
+
+Shared container reservations / Reservas entre procesos: add `--resource-store resources/shared` to contained audits with `--job-store`. One supervisor owns each explicit domain; see [coordination and recovery / coordinación y recuperación](docs/SHARED-RESOURCES.md).

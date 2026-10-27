@@ -5,7 +5,7 @@ import http from 'node:http';
 import {once} from 'node:events';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {writeFile,mkdtemp,readFile} from 'node:fs/promises';
+import {writeFile,mkdtemp,readFile,lstat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {gzipSync} from 'node:zlib';
@@ -55,8 +55,9 @@ try {
   const tlsReport=await auditPageInDocker(tlsOrigin,{imageId,network:tlsNetwork},{createMediator:(urls,network,options)=>createRequestMediator(urls,network,{...options,ca:cert})});assert.ok(tlsReport.violations.some(rule=>rule.id==='button-name'));
   await assert.rejects(auditPageInDocker(tlsOrigin,{imageId,network:tlsNetwork}));checks.verifiedTlsAndUntrustedCertificateDenied=true;
   stage='cli';const file=join(root,'project.json'),output=join(root,'cli.json');await writeFile(file,JSON.stringify({schemaVersion:1,name:'Contained CLI',urls:[origin+'/page'],network}));
-  await execute(process.execPath,['src/cli.js','--project',file,'--isolation-image',imageId,'--job-store',join(root,'jobs'),'--format','json','--output',output],{timeout:60000,maxBuffer:65536,windowsHide:true,shell:false});const cli=JSON.parse(await readFile(output,'utf8'));assert.equal(cli.totals.succeeded,1);assert.equal(cli.pages[0].report.isolation.imageId,imageId);checks.cli=true;
+  await execute(process.execPath,['src/cli.js','--project',file,'--isolation-image',imageId,'--job-store',join(root,'jobs'),'--resource-store',join(root,'resources'),'--format','json','--output',output],{timeout:60000,maxBuffer:65536,windowsHide:true,shell:false});const cli=JSON.parse(await readFile(output,'utf8'));assert.equal(cli.totals.succeeded,1);assert.equal(cli.pages[0].report.isolation.imageId,imageId);checks.cli=true;
   const journal=JSON.parse(await readFile(join(root,'jobs','jobs.json'),'utf8'));assert.equal(journal.records.length,1);assert.equal(journal.records[0].state,'succeeded');checks.queueJournal=true;
+  await assert.rejects(lstat(join(root,'resources','.resource-lock')),{code:'ENOENT'});await assert.rejects(lstat(join(root,'jobs','resource-lease.json')),{code:'ENOENT'});checks.sharedResourceReleased=true;
   stage='cleanup';assert.deepEqual(await dockerIds(),before);checks.ownedContainersRemoved=true;stage='complete';
 } catch(error) {failure={message:error.message,cause:error.cause?.message};}
 finally {for(const fixture of [server,forbidden,secure]){fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve));}}

@@ -18,6 +18,7 @@ if(args.length!==4||args[0]!=='--image'||args[2]!=='--output')throw new Error('U
 const imageId=immutableImage(args[1]),execute=promisify(execFile);
 const docker=async args=>(await execute('docker',args,{timeout:30000,maxBuffer:256*1024,windowsHide:true,shell:false})).stdout.trim();
 const root=await mkdtemp(join(tmpdir(),'accesspilot-recovery-'));
+const resourceDirectory=join(root,'shared-resources');
 const checks={},owned=[],queues=[];let stage='setup',failure,child,childExit,reach;
 const server=http.createServer((_req,_res)=>reach?.());
 const inventory=async()=> (await docker(['ps','-aq','--no-trunc','--filter',`ancestor=${imageId}`])).split(/\s+/).filter(Boolean).sort();
@@ -39,28 +40,30 @@ try {
   await writeFile(project,JSON.stringify({schemaVersion:1,name:'Crash fixture',urls:[origin+'/slow'],timeoutMs:120000,network:{allowPrivateOrigins:[origin]}}));
   stage='actual-supervisor-kill';
   const reached=new Promise(resolve=>reach=resolve);
-  child=spawn(process.execPath,['src/cli.js','--project',project,'--isolation-image',imageId,'--job-store',store],{windowsHide:true,stdio:'ignore'});
+  child=spawn(process.execPath,['src/cli.js','--project',project,'--isolation-image',imageId,'--job-store',store,'--resource-store',resourceDirectory],{windowsHide:true,stdio:'ignore'});
   childExit=once(child,'exit');
   await Promise.race([reached,childExit.then(()=>{throw new Error('Audit child exited before fixture request');}),delay(30000,undefined,{ref:false}).then(()=>{throw new Error('Fixture request not reached');})]);
   const intent=await readIntent(store);const inspected=JSON.parse(await docker(['inspect',intent.name]));
   assert.equal(inspected.length,1);const crashedId=verifyOwnedWorker(inspected[0],intent);owned.push({...intent,id:crashedId});
+  await assert.rejects(createAuditQueue({directory:join(root,'contender'),resourceDirectory}),/busy/);
   child.kill('SIGKILL');await childExit;child=null;
-  await assert.rejects(createAuditQueue({directory:store,recovery:true}),{code:'EEXIST'});checks.abandonedLockRefused=true;
+  await assert.rejects(createAuditQueue({directory:join(root,'contender'),resourceDirectory}),/busy/);checks.sharedDomainBlocksOtherSupervisor=true;
+  await assert.rejects(createAuditQueue({directory:store,recovery:true,resourceDirectory}),{code:'EEXIST'});checks.abandonedLockRefused=true;
   // This harness owns the killed process and has observed its exit. No automatic lock stealing in product code.
   await rmdir(join(store,'.queue-lock'));
-  const queue=await createAuditQueue({directory:store,recovery:true});queues.push(queue);
+  const queue=await createAuditQueue({directory:store,recovery:true,resourceDirectory});queues.push(queue);
   assert.equal(queue.snapshot().records[0].state,'interrupted');
-  const preview=await queue.recoverWorkers();assert.equal(preview.workers[0].containerId,crashedId);assert.equal(preview.workers[0].status,'owned');
+  const preview=await queue.recoverWorkers();assert.equal(preview.workers[0].containerId,crashedId);assert.equal(preview.workers[0].status,'owned');assert.equal(preview.resourceReservation.state,'owned');
   assert.equal(JSON.parse(await docker(['inspect',crashedId]))[0].Id,crashedId);checks.previewNoDeletion=true;
   stage='apply-owned-recovery';
-  const recovered=await queue.recoverWorkers({apply:true});assert.equal(recovered.workers[0].status,'removed');
+  const recovered=await queue.recoverWorkers({apply:true});assert.equal(recovered.workers[0].status,'removed');assert.equal(recovered.resourceReservation.released,true);checks.reservationRecovered=true;
   assert.equal((await readdir(join(store,'workers'))).length,0);
   await queue.close();checks.killedSupervisorRecoveredWithoutReplay=true;
-  const normal=await createAuditQueue({directory:store});queues.push(normal);assert.equal(normal.snapshot().active,0);await normal.close();
+  const normal=await createAuditQueue({directory:store,resourceDirectory});queues.push(normal);assert.equal(normal.snapshot().active,0);await normal.close();
   verifyOwnedWorker(JSON.parse(await docker(['inspect',foreignId]))[0],foreign,foreignId);checks.unrelatedSameImagePreserved=true;
 
   stage='controlled-container-oom';
-  const oomStore=join(root,'oom'),oomQueue=await createAuditQueue({directory:oomStore});queues.push(oomQueue);
+  const oomStore=join(root,'oom'),oomQueue=await createAuditQueue({directory:oomStore,resourceDirectory});queues.push(oomQueue);
   const oomClaim=claimFor(info.ID);let oomId;
   await oomQueue.submit(async(_signal,{workerLifecycle})=>{
     await workerLifecycle.reserve(oomClaim);
@@ -78,9 +81,12 @@ try {
     assert.equal(state.Running,false);assert.equal(state.OOMKilled,true);
     // Simulate loss before intent release; no audit evidence is produced.
   });
-  await oomQueue.close();
-  await assert.rejects(createAuditQueue({directory:oomStore}),/Unresolved/);
-  const oomRecovery=await createAuditQueue({directory:oomStore,recovery:true});queues.push(oomRecovery);
+  await assert.rejects(oomQueue.close(),/operator recovery/);
+  await assert.rejects(createAuditQueue({directory:join(root,'contender'),resourceDirectory}),/busy/);
+  // The harness owns the settled supervisor and its failed close; no live task remains.
+  await rmdir(join(oomStore,'.queue-lock'));
+  await assert.rejects(createAuditQueue({directory:oomStore,resourceDirectory}),/Unresolved/);
+  const oomRecovery=await createAuditQueue({directory:oomStore,recovery:true,resourceDirectory});queues.push(oomRecovery);
   const oomPreview=await oomRecovery.recoverWorkers();assert.equal(oomPreview.workers[0].oomKilled,true);assert.equal(oomPreview.workers[0].running,false);
   const oomResult=await oomRecovery.recoverWorkers({apply:true});assert.equal(oomResult.workers[0].status,'removed');await oomRecovery.close();checks.realOomRecordedAndRecovered=true;
   stage='cleanup';

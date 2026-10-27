@@ -42,3 +42,7 @@ WORKER-RECOVERY.md describes immutable pre-create ownership intents, exact Docke
 ## Reduced-data export increment
 
 SHARING-REPORTS.md documents an offline positive projection for sharing, exposed by CLI and protected read-only viewer. It omits source identifiers/free text, preserves unknown/failed coverage, and cannot be imported as canonical audit evidence. This does not redact private history or guarantee anonymity. Cross-process resource reservations, service security review and audit-execution UI remain pending.
+
+## Explicit cross-process domain admission
+
+SHARED-RESOURCES.md adds optional shared-domain exclusion across CLI supervisors. One owner holds a fixed two-worker container budget through cleanup; uncertain shutdown retains the reservation for ownership-checked offline recovery. This supersedes the earlier missing cross-process coordination statement only for processes selecting the same explicit domain. Fair per-slot inter-process scheduling, automatic machine-wide limits and independent service review remain pending.

@@ -25,7 +25,7 @@ function usage() {
   console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
   console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
   console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
-  console.log('Experimental Docker audit: --project config.json --isolation-image sha256:... (prebuilt local worker image required; optional --job-store directory)');
+  console.log('Experimental Docker audit: --project config.json --isolation-image sha256:... (prebuilt local worker image required; optional --job-store directory --resource-store shared-directory)');
   console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
   console.log('Manual template: --project config.json --review-template saved.json [--output review.json]');
   console.log('Attach manual review: --project config.json --review-audit saved.json --manual-review review.json --history directory');
@@ -89,7 +89,7 @@ export async function main(args=process.argv.slice(2)) {
       if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const sessionState=opts['session-state']?await loadSessionState(opts['session-state'],project):undefined;
-      if(opts['isolation-image']) queue=await createAuditQueue({directory:opts['job-store']});
+      if(opts['isolation-image']) queue=await createAuditQueue({directory:opts['job-store'],resourceDirectory:opts['resource-store']});
       const audit=queue ? (url,options)=>queue.submit(
         (signal,{workerLifecycle})=>auditPageInDocker(url,
           {...options,signal,imageId:opts['isolation-image']},{lifecycle:workerLifecycle}),
