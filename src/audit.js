@@ -10,8 +10,9 @@ import { startEgressProxy } from './egress-proxy.js';
 import { validateViewport } from './viewport.js';
 
 export async function auditPage(url, { launch = options => chromium.launch(options),
-  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport, authentication, sessionState, journey } = {}) {
+  analyze = page => new AxeBuilder({page}).analyze(), signal, timeoutMs = 30000, language = 'en', network, scopeUrls = [url], crawl, viewport, authentication, sessionState, journey, mediate } = {}) {
   url = normalizeUrl(url);
+  if(mediate!==undefined) {if(typeof mediate!=='function')throw new Error('Invalid request mediator');network=validateNetwork(network);}
   if(journey!==undefined) {journey=validateJourney(journey);network=validateNetwork(network);}
   if(authentication!==undefined) {
     network=validateNetwork(network);
@@ -36,8 +37,8 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     if(network) {
       policy=createNetworkPolicy(scopeUrls,network);
       policy.check(url,true);
-      proxy=await startEgressProxy(policy,{maxBytes:crawl?.maxBytesPerPage,timeoutMs:Math.min(timeoutMs,10000),maxRedirects:crawl?.maxRedirects,maxRequests:crawl?.maxRequestsPerPage,maxDurationMs:timeoutMs});
-      launchOptions.proxy={server:proxy.server,username:proxy.username,password:proxy.password,bypass:'<-loopback>'};
+      if(!mediate) {proxy=await startEgressProxy(policy,{maxBytes:crawl?.maxBytesPerPage,timeoutMs:Math.min(timeoutMs,10000),maxRedirects:crawl?.maxRedirects,maxRequests:crawl?.maxRequestsPerPage,maxDurationMs:timeoutMs});
+      launchOptions.proxy={server:proxy.server,username:proxy.username,password:proxy.password,bypass:'<-loopback>'};}
       launchOptions.chromiumSandbox=true;
       launchOptions.args=['--disable-quic','--dns-prefetch-disable','--force-webrtc-ip-handling-policy=disable_non_proxied_udp'];
     }
@@ -57,7 +58,10 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
           if(request.frame().page()!==auditPageRef) throw new Error('Additional page traffic is blocked');
           let redirects=0;for(let previous=request.redirectedFrom();previous;previous=previous.redirectedFrom()) redirects++;
           if(redirects>(crawl?.maxRedirects ?? 5)) throw new Error('Redirect budget exceeded');
-          await route.continue();
+          if(mediate) {
+            const response=await mediate({url:request.url(),method:request.method(),navigation:request.isNavigationRequest(),headers:await request.allHeaders()});
+            await route.fulfill({...response,body:Buffer.from(response.body,'base64')});
+          } else await route.continue();
         } catch(error) {deny(error.message);await route.abort().catch(()=>{});}
       });
       await context.routeWebSocket('**/*',socket=>{deny('WebSockets are blocked');socket.close();});
@@ -70,7 +74,7 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
     report = await Promise.race([aborted, (async () => {
       const page = await context.newPage();auditPageRef=page;
       if(policy) page.on('worker',()=>{deny('Dedicated workers are not supported in restricted audits');page.close().catch(()=>{});});
-      if(policy) {
+      if(policy&&!mediate) {
         const session=await context.newCDPSession(page);let redirects=0;
         session.on('Fetch.requestPaused',async event=>{
           try {
@@ -108,9 +112,9 @@ export async function auditPage(url, { launch = options => chromium.launch(optio
         for(let i=0;i<Math.min(elements.length,limit);i++) links.push(elements[i].href);
         return {links,truncated:elements.length>limit};
       },crawl.maxLinksPerPage);
-      if(proxy) {
-        if(blocked.length||proxy.failures.length) throw new Error('Restricted audit incomplete: '+[...blocked,...proxy.failures].join('; '));
-        evidence.network={policyVersion:2,requests:requestCount,transferBytes:proxy.bytes};
+      if(policy) {
+        if(blocked.length||proxy?.failures.length) throw new Error('Restricted audit incomplete: '+[...blocked,...(proxy?.failures??[])].join('; '));
+        evidence.network={policyVersion:mediate?3:2,requests:requestCount,...(proxy?{transferBytes:proxy.bytes}:{})};
         await page.close();
       }
       return evidence;

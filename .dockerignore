@@ -1,0 +1,12 @@
+**
+!package.json
+!package-lock.json
+!src/
+!src/**
+!worker/
+!worker/Dockerfile
+!worker/entry.js
+!worker/guard.js
+!LICENSE
+!worker/LICENSE-APACHE-2.0
+!worker/THIRD-PARTY.md

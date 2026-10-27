@@ -1,3 +1,4 @@
+import {auditPage} from '../src/audit.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -39,4 +40,14 @@ test('real Chromium consumes mediated redirects, gzip, HttpOnly cookies and asse
   const cookies=await context.cookies();assert.ok(cookies.some(cookie=>cookie.name==='session'&&cookie.value==='fixture'&&cookie.httpOnly));assert.ok(cookies.some(cookie=>cookie.name==='language'&&cookie.value==='es'));
   assert.ok(received.find(entry=>entry.path==='/page').cookie.includes('session=fixture'));assert.ok(received.find(entry=>entry.path==='/asset.js').cookie.includes('session=fixture'));
   assert.deepEqual(failures,[]);assert.equal(mediator.failed,false);assert.ok(mediator.bytes>0);
+});
+
+
+test('audit service performs real axe through mediated route fulfillment and marks policy 3', {timeout:30000},async t=>{
+  const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html lang="en"><head><title>Fixture</title></head><body><main><h1>Fixture</h1><button></button></main></body></html>');});
+  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();return new Promise(resolve=>server.close(resolve));});
+  const origin=`http://127.0.0.1:${server.address().port}`,network={allowPrivateOrigins:[origin]};
+  const mediator=createRequestMediator([origin],network);t.after(()=>mediator.close());
+  const report=await auditPage(origin,{network,mediate:mediator.fetch});
+  assert.ok(report.violations.some(rule=>rule.id==='button-name'));assert.equal(report.network.policyVersion,3);assert.equal(mediator.failed,false);
 });

@@ -1,3 +1,4 @@
+import {validateIsolation} from './isolation.js';
 import { validateManualReviews } from './manual-review.js';
 import { validateJourney, sameJourney } from './journey.js';
 import { open } from 'node:fs/promises';
@@ -60,7 +61,9 @@ export function validateSnapshot(input) {
       if(!Number.isInteger(report.network.policyVersion)||report.network.policyVersion<1) throw new Error('Invalid snapshot network policy version');
       network={policyVersion:report.network.policyVersion};
     }
-    return {url,status:'succeeded',...profile,...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,...profile,...authentication,engine,network,violations,...(rich?reviewDetails(report,target):{})}};
+    const isolation=report.isolation===undefined?{}:{isolation:validateIsolation(report.isolation)};
+    if((network?.policyVersion===3)!==!!isolation.isolation)throw new Error('Worker network policy requires isolation evidence');
+    return {url,status:'succeeded',...profile,...(project.crawl?{depth:page.depth}:{}),report:{schemaVersion:1,kind:'page-audit',url:finalUrl,...profile,...authentication,engine,network,...isolation,violations,...(rich?reviewDetails(report,target):{})}};
   });
   for(const seed of project.urls) for(const viewport of profiles) for(const journey of project.journeys??[null]) if(!seen.has(pageKey({url:seed,viewport,journey}))) throw new Error('Snapshot omits a configured seed/profile');
   let generatedAt=null;
@@ -130,6 +133,7 @@ export function compareAudits(beforeInput, afterInput) {
     else if (oldPage.report.url !== newPage.report.url) reason='destination-changed';
     else if(before.project.network&&(!oldPage.report.network||!newPage.report.network)) reason='network-policy-unknown';
     else if(before.project.network&&oldPage.report.network.policyVersion!==newPage.report.network.policyVersion) reason='network-policy-changed';
+    else if(JSON.stringify(oldPage.report.isolation??null)!==JSON.stringify(newPage.report.isolation??null))reason='isolation-changed';
     else if (!oldPage.report.engine || !newPage.report.engine) reason='engine-unknown';
     else if (JSON.stringify(oldPage.report.engine) !== JSON.stringify(newPage.report.engine)) reason='engine-changed';
     if (reason) {totals.incomparablePages++;return {url,...profile,status:'incomparable',reason};}

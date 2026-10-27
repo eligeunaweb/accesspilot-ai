@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {auditPageInDocker} from './docker-audit.js';
 import { createReviewTemplate, attachManualReview } from './manual-review-service.js';
 import { readConfiguration } from './project.js';
 import { loadSessionState } from './session.js';
@@ -22,6 +23,7 @@ function usage() {
   console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
   console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
   console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
+  console.log('Experimental Docker audit: --project config.json --isolation-image sha256:... (prebuilt local worker image required)');
   console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
   console.log('Manual template: --project config.json --review-template saved.json [--output review.json]');
   console.log('Attach manual review: --project config.json --review-audit saved.json --manual-review review.json --history directory');
@@ -50,6 +52,7 @@ export async function main(args=process.argv.slice(2)) {
     if (opts.project) {
       const project = await loadProject(opts.project);
       if (opts.lang) project.language = opts.lang;
+      if(opts['isolation-image'])project.network??={};
       if(opts['review-template']||opts['manual-review']) {
         const snapshot=await loadSnapshot(opts['review-template']??opts['review-audit'],{enrich:true});
         if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Manual review audit belongs to another project');
@@ -74,7 +77,7 @@ export async function main(args=process.argv.slice(2)) {
       if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const sessionState=opts['session-state']?await loadSessionState(opts['session-state'],project):undefined;
-      const run = await auditProject(project, {signal:controller.signal,sessionState});
+      const run = await auditProject(project, {signal:controller.signal,sessionState,...(opts['isolation-image']?{audit:(url,options)=>auditPageInDocker(url,{...options,imageId:opts['isolation-image']})}:{})});
       if (baseline) run.comparison = compareAudits(baseline, run);
       if (opts.history) { const id = await saveHistory(opts.history, run); console.error(`History saved: ${id}`); }
       const output = renderProject(run, opts.format);
