@@ -395,3 +395,8 @@ Local verification: 13 new tests plus the existing suite, **360/360 passed**, ze
 An initial full invocation stalled after runner tests and was interrupted; no failure was emitted and its cause remains unconfirmed. Isolated viewer/sharing/session runs and the bounded full repeat passed. Preserve that stall as unresolved evidence rather than claim it was fixed. Initial paused-client fixture assumptions about writableLength were corrected to a controlled throttled HTTP fixture; finish is not client acknowledgement. Current changes have not yet passed remote native CI or fresh Docker Desktop acceptance. Internal review does not satisfy independent security review, host heap/CPU isolation, Apple Silicon or human acceptance.
 
 Verificación local: **360 pruebas satisfactorias**, ninguna fallida/omitida; primera ejecución detenida e interrumpida, causa sin confirmar. No se declara validación remota ni revisión independiente.
+
+
+### Native CI contention follow-up
+
+Run 40551305202 at 334c748 passed seven jobs: Windows/Linux Node 22/24, macOS Intel Node 22, isolation prerequisite and controlled Docker browser/recovery. macOS Intel Node 24 cancelled the last E2E child at the unchanged parent 120-second deadline; all new service guard cases passed. Sequential scenario durations accumulated under concurrent browser-file load; contention remains the working diagnosis. npm test now uses one test file at a time, preserving every test and the E2E deadline. Full local serial repeat: 360/360 passed, no failures/cancellations/skips, 103435.2076 ms using the same restricted-host adapter and a diagnostic per-file ceiling of 120 seconds. Remote validation of this adjustment remains required.
