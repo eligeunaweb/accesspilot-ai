@@ -18,7 +18,7 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
   integer(cpu, 1, 4, 'cpu');
   integer(maxQueued, 1, 100, 'maxQueued');
   const capacity = Math.min(maxWorkers, Math.floor(memoryMiB / 1024), cpu);
-  let ownsLock = false, closing;
+  let ownsLock = false, closing, unsafeCleanup = false;
   let root, lock, records = [], closed = false, fatal = false, active = 0;
   let serial = Promise.resolve();
   const waiting = [], running = new Set(), idle = new Set();
@@ -99,7 +99,12 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
       job.row.state = job.controller.signal.aborted ? 'cancelled' : 'succeeded';
       await save();
       if (job.controller.signal.aborted) job.reject(cancelled()); else job.resolve(result);
-    } catch {
+    } catch (error) {
+      if (error?.code === 'ACCESSPILOT_CLEANUP_UNVERIFIED') {
+        unsafeCleanup = true;
+        fatal = true;
+        for (const activeJob of running) activeJob.controller.abort();
+      }
       job.row.state = fatal ? 'interrupted' : job.controller.signal.aborted ? 'cancelled' : 'failed';
       try { await save(); } catch { job.row.state = 'interrupted'; }
       // Never journal or expose arbitrary task errors, which can contain session/page data.
@@ -157,7 +162,8 @@ export async function createAuditQueue({directory, maxWorkers = 2, memoryMiB = 2
       for (const job of running) job.controller.abort();
       if (active) await new Promise(resolve => idle.add(resolve));
       await serial;
-      try { await persist(); } finally { if (lock) await rmdir(lock); }
+      try { await persist(); } finally { if (lock && !unsafeCleanup) await rmdir(lock); }
+      if (unsafeCleanup) throw new Error('Unverified container cleanup; operator recovery required');
       })();
       return closing;
     }

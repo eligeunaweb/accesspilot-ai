@@ -174,3 +174,20 @@ test('journal retention remains bounded and removes only oldest terminal records
   assert.equal(current.length,1000); assert.equal(current[0].id,records[1].id);
   assert.equal(current.at(-1).state,'succeeded'); await queue.close();
 });
+
+test('unverified container cleanup stops the supervisor before any queued task launches', async t => {
+  const directory=await fixture(t);
+  const queue=await createAuditQueue({maxWorkers:1,directory}); let release;
+  const first=queue.submit(async()=>{
+    await new Promise(resolve=>release=resolve);
+    throw Object.assign(new Error('private cleanup detail'),{code:'ACCESSPILOT_CLEANUP_UNVERIFIED'});
+  });
+  const firstRejected=assert.rejects(first,/failed/);
+  while (!release) await tick();
+  const secondRejected=assert.rejects(queue.submit(()=>assert.fail('orphan budget reused')),/stopped/);
+  release(); await Promise.all([firstRejected,secondRejected]);
+  assert.equal(queue.snapshot().failed,true);
+  await assert.rejects(queue.submit(()=>0),/failed/);
+  await assert.rejects(queue.close(),/operator recovery required/);
+  await assert.rejects(createAuditQueue({directory}),{code:'EEXIST'});
+});

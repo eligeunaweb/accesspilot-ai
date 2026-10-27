@@ -12,7 +12,7 @@ El registro versionado contiene exclusivamente UUID y estado: queued, running, s
 
 Una sola instancia posee `.queue-lock`. Una segunda instancia falla. El bloqueo abandonado **no se roba automáticamente**: primero detén al propietario anterior y comprueba sus contenedores; después retira únicamente el directorio vacío `.queue-lock` del almacén elegido. No borres el registro. Al reabrir, queued/running pasan a interrupted; nunca se reejecutan. Una caída abrupta puede dejar contenedores: este registro no autoriza eliminarlos y todavía no contiene una asociación verificable de propiedad para recuperarlos automáticamente. No borrar por imagen o prefijo.
 
-Un fallo del registro detiene admisiones y solicita cancelación de los trabajos activos. El cierre espera al adaptador: tareas arbitrarias que ignoren AbortSignal no tienen garantía de terminación. El adaptador Docker existente dispone de sus propios tiempos máximos y limpieza. El apagado forzoso del sistema sigue siendo una recuperación manual.
+Una limpieza de contenedor no verificable detiene el supervisor y cancela los demás trabajos: no reutiliza silenciosamente una reserva potencialmente ocupada. Un fallo del registro detiene admisiones y solicita cancelación de los trabajos activos. El cierre espera al adaptador: tareas arbitrarias que ignoren AbortSignal no tienen garantía de terminación. El adaptador Docker existente dispone de sus propios tiempos máximos y limpieza. El apagado forzoso del sistema sigue siendo una recuperación manual.
 
 ## English
 
@@ -23,3 +23,7 @@ Add `--job-store .accesspilot-jobs` for a private lifecycle journal; otherwise s
 The bounded journal stores only opaque UUIDs and lifecycle states, never credentials, URLs, payloads, results or page errors. Exclusive directory ownership fails closed. After confirming the old process and its containers have stopped, an operator may remove an abandoned empty `.queue-lock`. Reopening marks unfinished jobs interrupted without replay. Automatic orphan-container recovery, independent security review, cross-process reservations and host resource measurements remain pending. File sync plus atomic rename does not guarantee recovery after power loss. Protect the directory with OS permissions.
 
 Cancellation and shutdown preserve slots until cleanup finishes. Tasks must honor AbortSignal; the Docker adapter has its own bounded operations. The journal is operational metadata, separate from audit evidence/history.
+
+Unverified container cleanup is a fatal supervisor condition; pending tasks never launch and other active tasks are cancelled. An operator must investigate possible orphans before starting a new supervisor.
+
+If container cleanup is unverified, close fails and retains the persistent ownership lock for explicit operator investigation. / Si la limpieza es incierta, el cierre falla y conserva el bloqueo persistente hasta la intervención del operador.

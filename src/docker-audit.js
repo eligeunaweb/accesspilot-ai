@@ -132,6 +132,10 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
       } catch {cleanupFailed=true;failure=new Error('Contained audit failed: owned container cleanup could not be verified');}
     }
   }
-  if(failure)throw new Error('Contained audit failed; verify Docker profile, browser sandbox, scope, deadline and owned cleanup'+(cleanupFailed?'; inspect '+name:''),{cause:failure});
+  if(failure) {
+    const error=new Error('Contained audit failed; verify Docker profile, browser sandbox, scope, deadline and owned cleanup'+(cleanupFailed?'; inspect '+name:''),{cause:failure});
+    if(cleanupFailed)error.code='ACCESSPILOT_CLEANUP_UNVERIFIED';
+    throw error;
+  }
   return result;
 }
