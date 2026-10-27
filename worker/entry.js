@@ -4,26 +4,30 @@ import {JsonLines,fields,send} from '../src/worker-protocol.js';
 import {validateJob} from '../src/worker-job.js';
 import {guard} from './guard.js';
 
-let started=false,finished=false,nextId=0,stage='guard';
+let started=false,finished=false,nextId=0,stage='guard',startupDiagnostic;
 const pending=new Map(),controller=new AbortController();
 const output=value=>send(process.stdout,value);
 function fatal() {
   if(finished)return;finished=true;controller.abort();
   for(const item of pending.values())item.reject(new Error('Worker channel failed'));pending.clear();
-  output({type:'error',code:stage+'-failed',message:'Contained audit failed'}).finally(()=>process.exit(2));
+  output({type:'error',code:stage+'-failed',message:'Contained audit failed',...(stage==='sandbox'&&startupDiagnostic?{startupDiagnostic}:{})}).finally(()=>process.exit(2));
 }
 async function launch(options) {
-  const browser=await chromium.launch({...options,channel:'chromium'});
+  let browser;
+  try {browser=await chromium.launch({...options,channel:'chromium'});}
+  catch(error) {startupDiagnostic='launch: '+String(error.message).slice(0,4000);throw error;}
   try {
     const context=await browser.newContext(),page=await context.newPage();
     await page.goto('chrome://sandbox');const text=await page.locator('body').innerText();
-    if(!/Namespace sandbox\s+Yes/.test(text)||!/Seccomp-BPF sandbox\s+Yes/.test(text))throw new Error('Chromium sandbox proof failed');
-    let directDenied=false;
-    try {await page.goto('http://169.254.169.254/',{timeout:3000});}
-    catch(error) {directDenied=/net::ERR_(INTERNET_DISCONNECTED|ADDRESS_UNREACHABLE|NETWORK_ACCESS_DENIED|FAILED)/.test(error.message);}
-    if(!directDenied)throw new Error('Chromium direct egress was not denied');
+    if(!/Namespace sandbox\s+Yes/.test(text)||!/Seccomp-BPF sandbox\s+Yes/.test(text))throw new Error('Chromium sandbox proof failed: '+text.slice(0,2000));
+    for(const target of ['http://169.254.169.254/','http://10.0.0.1/','http://1.1.1.1/','http://[2606:4700:4700::1111]/']) {
+      let directDenied=false;
+      try {await page.goto(target,{timeout:3000});}
+      catch(error) {directDenied=/net::ERR_(INTERNET_DISCONNECTED|ADDRESS_UNREACHABLE|NETWORK_ACCESS_DENIED|FAILED)/.test(error.message);}
+      if(!directDenied)throw new Error('Chromium direct egress was not denied');
+    }
     await context.close();stage='audit';await output({type:'sandbox',namespace:true,seccomp:true,directDenied:true});return browser;
-  } catch(error) {await browser.close();throw error;}
+  } catch(error) {startupDiagnostic='proof: '+String(error.message).slice(0,4000);await browser.close();throw error;}
 }
 function mediate(request) {
   if(finished||pending.size>=68)return Promise.reject(new Error('Worker request capacity exceeded'));

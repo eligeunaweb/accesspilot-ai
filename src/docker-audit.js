@@ -58,7 +58,7 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
   const profile=JSON.parse(profileSource),owner=randomUUID(),name=`accesspilot-worker-${randomUUID()}`,controller=new AbortController();
   const cancel=()=>controller.abort();signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();
   const timer=setTimeout(cancel,job.timeoutMs+30000);
-  let created=false,containerId,child,mediator,result,failure;
+  let created=false,cleanupFailed=false,containerId,child,mediator,result,failure;
   const docker=async args=>(await execute('docker',args,{timeout:30000,maxBuffer:256*1024,windowsHide:true,shell:false})).stdout.trim();
   try {
     const info=JSON.parse(await docker(['info','--format','{{json .}}']));controller.signal.throwIfAborted();
@@ -97,9 +97,10 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
           accepted=reportFromWorker(value.report,job,imageId,mediator);phase='finished';child.stdin.end();return;
         }
         if(value?.type==='error') {
-          fields(value,['type','code','message']);
+          fields(value,['type','code','message','startupDiagnostic']);
           if(!['guard-failed','sandbox-failed','audit-failed'].includes(value.code))throw new Error('Invalid worker failure');
-          throw new Error('Worker rejected execution: '+value.code);
+          if(value.startupDiagnostic!==undefined&&(phase!=='sandbox'||value.code!=='sandbox-failed'||typeof value.startupDiagnostic!=='string'||value.startupDiagnostic.length>4100))throw new Error('Invalid startup diagnostic');
+          throw new Error('Worker rejected execution: '+value.code+(value.startupDiagnostic?' / '+value.startupDiagnostic:''));
         }
         throw new Error('Contained worker sent an unknown message');
       });
@@ -124,9 +125,9 @@ export async function auditPageInDocker(url,{imageId,signal,...options}={}, {exe
         const owned=JSON.parse(await docker(['inspect',name]));
         if(owned.length!==1||owned[0].Config?.Labels?.['org.accesspilot.worker']!==owner||!/^[a-f0-9]{64}$/.test(owned[0].Id))throw new Error('Worker cleanup ownership unverified');
         await docker(['rm','--force','--volumes',owned[0].Id]);
-      } catch {failure=new Error('Contained audit failed: owned container cleanup could not be verified');}
+      } catch {cleanupFailed=true;failure=new Error('Contained audit failed: owned container cleanup could not be verified');}
     }
   }
-  if(failure)throw new Error('Contained audit failed; verify Docker profile, browser sandbox, scope, deadline and owned cleanup',{cause:failure});
+  if(failure)throw new Error('Contained audit failed; verify Docker profile, browser sandbox, scope, deadline and owned cleanup'+(cleanupFailed?'; inspect '+name:''),{cause:failure});
   return result;
 }

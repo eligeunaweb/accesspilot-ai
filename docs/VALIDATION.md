@@ -323,3 +323,8 @@ Español: 260 pruebas locales aprobadas sin fallos ni omisiones; auditoría npm 
 - New eighth CI job builds the Playwright-version-matched worker and runs real controlled Docker browser acceptance. Its result must be checked on the published head; the previous seven-job pass does not validate this backend.
 - Experimental CLI option is project-only, image-ID-only and incompatible with offline/viewer operations. Old CLI paths and old manual evidence fingerprints remain tested. Network policy 3 requires isolation provenance; changed images are incomparable.
 - See [CONTAINED-BROWSER.md](CONTAINED-BROWSER.md) for commands, kernel controls, third-party notices and remaining security/production/Docker Desktop gates. No release, merge or deployment.
+
+
+### Worker hardening and first real attempt
+
+The next local full run passed 271 tests, zero failed/skipped, 36.058 s, after adding strict null rejection and ownership-mismatch cleanup coverage. The real Docker job in run 40499072757 built image sha256:c92303f88e339fe63a9e2686efb3251f027fb422e92dfdaa868845e4a598308c but failed at sandbox acceptance before the first audit. This is a failed acceptance, not validation of a working backend. A bounded pre-audit startup diagnostic was added to investigate without disabling protections. Controlled coverage now also requests journeys, crawling and redirect cookies. Further CI result must be checked on the new head.

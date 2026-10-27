@@ -33,7 +33,7 @@ test('inspection fails closed for altered security, network, entrypoint, resourc
 });
 test('worker job rejects arbitrary code, secrets without authentication, unsupported budgets and invalid targets',()=>{
   assert.equal(validateJob({url:'https://example.org'}).network.allowPrivateOrigins.length,0);
-  for(const options of [{launch:'code'},{sessionState:{}},{crawl:{maxBytesPerPage:32*1024*1024}},{timeoutMs:1},{scopeUrls:['https://other.org']}])assert.throws(()=>validateJob({url:'https://example.org',...options}));
+  for(const options of [{launch:'code'},{crawl:null},{viewport:null},{journey:null},{authentication:null},{network:null},{scopeUrls:null},{sessionState:{}},{crawl:{maxBytesPerPage:32*1024*1024}},{timeoutMs:1},{scopeUrls:['https://other.org']}])assert.throws(()=>validateJob({url:'https://example.org',...options}));
 });
 test('Docker option is restricted to project audits and immutable local image IDs',()=>{
   assert.equal(parse(['--project','p.json','--isolation-image',imageId])['isolation-image'],imageId);
@@ -59,7 +59,7 @@ async function supervisorFixture(mode) {
   const execute=async(command,args)=>{
     if(args[0]==='info')return {stdout:JSON.stringify({OSType:'linux',SecurityOptions:[]})};
     if(args[0]==='create'){owner=args[args.indexOf('--label')+1].split('=')[1];return {stdout:id};}
-    if(args[0]==='inspect') {const c=container(owner);if(mode==='inspection')c.HostConfig.NetworkMode='host';return {stdout:JSON.stringify([c])};}
+    if(args[0]==='inspect') {const c=container(owner);if(mode==='inspection')c.HostConfig.NetworkMode='host';if(mode==='cleanup'&&args[1].startsWith('accesspilot-worker-'))c.Config.Labels['org.accesspilot.worker']='someone-else';return {stdout:JSON.stringify([c])};}
     if(args[0]==='rm'){assert.equal(args.at(-1),id);removed=true;return {stdout:id};}
     throw new Error('Unexpected Docker command');
   };
@@ -83,8 +83,8 @@ async function supervisorFixture(mode) {
   let result;
   if(mode==='success')result=await auditPageInDocker('https://example.org',{imageId},{execute,spawnWorker});
   else await assert.rejects(auditPageInDocker('https://example.org',{imageId},{execute,spawnWorker}),/Contained audit failed/);
-  assert.equal(removed,true);assert.equal(spawned,mode!=='inspection');return result;
+  assert.equal(removed,mode!=='cleanup');assert.equal(spawned,mode!=='inspection');return result;
 }
-for(const mode of ['success','inspection','sequence'])test(`mocked supervisor ${mode} checks completion and owned cleanup (not Docker evidence)`,async()=>{
+for(const mode of ['success','inspection','sequence','cleanup'])test(`mocked supervisor ${mode} checks completion and owned cleanup (not Docker evidence)`,async()=>{
   const result=await supervisorFixture(mode);if(result)assert.equal(result.isolation.imageId,imageId);
 });

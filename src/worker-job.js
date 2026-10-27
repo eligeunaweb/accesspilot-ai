@@ -6,9 +6,9 @@ import {validateSessionState} from './session.js';
 export function validateJob(input) {
   fields(input,['url','scopeUrls','network','timeoutMs','language','crawl','viewport','authentication','sessionState','journey']);
   const url=normalizeUrl(input.url);
-  const project=validateProject({schemaVersion:1,name:'Isolated worker',urls:input.scopeUrls??[url],network:input.network??{},
-    timeoutMs:input.timeoutMs,language:input.language,...(input.crawl?{crawl:input.crawl}:{}),
-    ...(input.viewport?{viewports:[input.viewport]}:{}),...(input.journey?{journeys:[input.journey]}:{}),...(input.authentication?{authentication:input.authentication}:{})});
+  const project=validateProject({schemaVersion:1,name:'Isolated worker',urls:input.scopeUrls===undefined?[url]:input.scopeUrls,network:input.network===undefined?{}:input.network,
+    timeoutMs:input.timeoutMs,language:input.language,...(input.crawl!==undefined?{crawl:input.crawl}:{}),
+    ...(input.viewport!==undefined?{viewports:[input.viewport]}:{}),...(input.journey!==undefined?{journeys:[input.journey]}:{}),...(input.authentication!==undefined?{authentication:input.authentication}:{})});
   createNetworkPolicy(project.urls,project.network).check(url,true);
   if(project.crawl?.maxBytesPerPage>16*1024*1024)throw new Error('Worker response budget cannot exceed 16 MiB');
   const state=input.sessionState===undefined?undefined:validateSessionState(input.sessionState,project);
