@@ -1,0 +1,25 @@
+name: Apple Silicon acceptance (manual)
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 20
+      - run: npm test
+        timeout-minutes: 5
+      - run: npm audit --audit-level=high
