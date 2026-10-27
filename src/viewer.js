@@ -7,6 +7,7 @@ import { historyFilters, filterHistory } from './history-filter.js';
 import { compareAudits } from './comparison.js';
 import { evidenceFilters } from './evidence-filter.js';
 import { richRunView, historyTrendView } from './history-detail-view.js';
+import {renderShareReport} from './share-report.js';
 import { exportHistory } from './history-export.js';
 
 import { copy, escape, shell, query, comparisonView, historyView, dashboardView } from './viewer-html.js';
@@ -70,20 +71,22 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
         res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(shell(workspace,t,lang,base,title,body,nonce));return;
       }
       const download=get('download');
-      if(download!==null && (!['json','html','csv'].includes(download)||!run)) {reject(400);return;}
+      if(download!==null && (!['json','html','csv','share-json','share-html','share-csv'].includes(download)||!run)) {reject(400);return;}
       if(['run','before','after'].some(key=>get(key)==='')) {reject(400);return;}
       if((run && (before||after||page)) || (!!before!==!!after) || ((before||after)&&page) || (page!==null&&!/^[1-9]\d{0,5}$/.test(page))) {reject(400);return;}
       let title=t.history,body='';
       if(run) {
         const [snapshot]=await readHistory(root,project,[run]);title=t.run;
         if(download) {
-          const output=exportHistory(snapshot,download,lang);
-          const type={json:'application/json',html:'text/html',csv:'text/csv'}[download];
-          res.writeHead(200,{'Content-Type':`${type}; charset=utf-8`,'Content-Disposition':`attachment; filename="accesspilot-evidence.${download}"`});
+          const shared=download.startsWith('share-'),format=shared?download.slice(6):download;
+          const output=shared?renderShareReport(snapshot,format,lang):exportHistory(snapshot,format,lang);
+          const type={json:'application/json',html:'text/html',csv:'text/csv'}[format];
+          res.writeHead(200,{'Content-Type':`${type}; charset=utf-8`,'Content-Disposition':`attachment; filename="accesspilot-${shared?'shared-summary':'evidence'}.${format}"`});
           res.end(output);return;
         }
         const downloads=['json','html','csv'].map(format=>`<a href="${escape(query(base,lang,{run,download:format}))}">${lang==='es'?'Descargar evidencia':'Download evidence'} ${format.toUpperCase()}</a>`).join(' · ');
-        body=`<p class="run-id">${escape(run)}</p><p>${downloads}</p>${richRunView(snapshot,evidence,lang,base,run)}`;
+        const sharedDownloads=['json','html','csv'].map(format=>`<a href="${escape(query(base,lang,{run,download:'share-'+format}))}">${lang==='es'?'Resumen para compartir':'Shared summary'} ${format.toUpperCase()}</a>`).join(' · ');
+        body=`<p class="run-id">${escape(run)}</p><p>${downloads}</p><p>${sharedDownloads}</p><p>${lang==='es'?'Los resúmenes reducen datos sensibles; revísalos antes de compartir. No sustituyen la evidencia original.':'Summaries reduce sensitive data; review before sharing. They do not replace original evidence.'}</p>${richRunView(snapshot,evidence,lang,base,run)}`;
       } else if(before&&after) {
         const snapshots=await readHistory(root,project,[before,after]);title=t.result;
         body=`<p class="run-id">${escape(t.before)}: ${escape(before)}<br>${escape(t.after)}: ${escape(after)}</p>${comparisonView(compareAudits(...snapshots),t)}`;

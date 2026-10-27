@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {renderShareReport} from './share-report.js';
 import {createAuditQueue} from './audit-queue.js';
 import {auditPageInDocker} from './docker-audit.js';
 import { createReviewTemplate, attachManualReview } from './manual-review-service.js';
@@ -28,6 +29,7 @@ function usage() {
   console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
   console.log('Manual template: --project config.json --review-template saved.json [--output review.json]');
   console.log('Attach manual review: --project config.json --review-audit saved.json --manual-review review.json --history directory');
+  console.log('Share reduced-data summary: --share-report saved.json [--format text|json|html|csv] [--lang en|es] [--output NEW_FILE]');
   console.log('Import evidence: --project config.json --history directory --import-history saved.json');
 }
 export async function main(args=process.argv.slice(2)) {
@@ -40,6 +42,14 @@ export async function main(args=process.argv.slice(2)) {
   process.once('SIGINT', cancel);
   process.once('SIGTERM', cancel);
   try {
+    if(opts['share-report']) {
+      const output=renderShareReport(await loadSnapshot(opts['share-report'],{enrich:true}),opts.format,opts.lang);
+      if(opts.output) {
+        await writeFile(opts.output,output,{encoding:'utf8',flag:'wx',mode:0o600});
+        console.log('Reduced-data summary written');
+      } else console.log(output);
+      return 0;
+    }
     if (opts.serveHistory) {
       const selection=opts.workspace ? {workspace:await loadWorkspace(opts.workspace)} : {project:await loadProject(opts.project)};
       if(opts.lang) (selection.workspace??selection.project).language=opts.lang;

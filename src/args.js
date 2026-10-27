@@ -5,7 +5,7 @@ export function parse(args) {
   const opts = {format:'text', output:null, fail:false, url:null, project:null};
   for(let i=0;i<args.length;i++) {
     const arg=args[i];
-    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history' || arg==='--session-state' || arg==='--review-template' || arg==='--review-audit' || arg==='--manual-review' || arg==='--isolation-image' || arg==='--job-store') {
+    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history' || arg==='--session-state' || arg==='--review-template' || arg==='--review-audit' || arg==='--manual-review' || arg==='--isolation-image' || arg==='--job-store' || arg==='--share-report') {
       if(!args[i+1] || args[i+1].startsWith('--')) throw new Error(`Missing value for ${arg}`);
       opts[arg.slice(2)]=args[++i];
     } else if(arg==='--list-history') opts.listHistory=true;
@@ -16,6 +16,13 @@ export function parse(args) {
     else if(arg.startsWith('-')) throw new Error(`Unknown option: ${arg}`);
     else if(opts.url) throw new Error('Only one URL is supported');
     else opts.url=arg;
+  }
+  if(opts['share-report']!==undefined) {
+    const allowed=new Set(['format','output','fail','url','project','share-report','lang']);
+    if(Object.keys(opts).some(key=>!allowed.has(key))||opts.fail||opts.url||opts.project) throw new Error('--share-report is an offline export; use only --format, --lang and --output');
+    if(!['text','json','html','csv'].includes(opts.format))throw new Error('Format must be text, json, html, or csv');
+    if(opts.lang!==undefined)languageCode(opts.lang);
+    return opts;
   }
   if(opts.project && opts.url) throw new Error('Use a URL or --project, not both');
   if(opts.workspace && (opts.project || opts.url)) throw new Error('Use --workspace or a project/URL, not both');
