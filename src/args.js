@@ -5,7 +5,7 @@ export function parse(args) {
   const opts = {format:'text', output:null, fail:false, url:null, project:null};
   for(let i=0;i<args.length;i++) {
     const arg=args[i];
-    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history' || arg==='--session-state' || arg==='--review-template' || arg==='--review-audit' || arg==='--manual-review' || arg==='--isolation-image') {
+    if(arg==='--format' || arg==='--output' || arg==='--project' || arg==='--workspace' || arg==='--lang' || arg==='--baseline' || arg==='--history' || arg==='--keep-runs' || arg==='--port' || arg==='--import-history' || arg==='--session-state' || arg==='--review-template' || arg==='--review-audit' || arg==='--manual-review' || arg==='--isolation-image' || arg==='--job-store') {
       if(!args[i+1] || args[i+1].startsWith('--')) throw new Error(`Missing value for ${arg}`);
       opts[arg.slice(2)]=args[++i];
     } else if(arg==='--list-history') opts.listHistory=true;
@@ -53,6 +53,7 @@ export function parse(args) {
     immutableImage(opts['isolation-image']);
     if(!opts.project||opts.workspace||opts.listHistory||opts.pruneHistory||opts.serveHistory||opts['import-history']||opts['review-template']||opts['manual-review']||opts['review-audit'])throw new Error('--isolation-image requires a project audit');
   }
+  if(opts['job-store']!==undefined && !opts['isolation-image']) throw new Error('--job-store requires --isolation-image');
   if(opts.project || opts.workspace) return opts;
   let url;
   try {url=new URL(opts.url);} catch {throw new Error('Invalid URL');}

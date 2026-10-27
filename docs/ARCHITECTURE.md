@@ -30,3 +30,7 @@ Configuration: at most 1 MiB, 100 explicit URLs, concurrency 1–4, per-page bud
 Documentation and portability: Node 22.12+, npm lockfile, no platform-specific shell assumptions in product code. Test Windows/Linux/macOS via Actions, never call an unexecuted matrix verified. No required SaaS or paid service. Preserve legacy single-URL output and exit semantics except previously documented HTTP error fix.
 
 See NETWORK-CRAWLING.md for actual implemented controls and the Windows nested-sandbox validation limitation. Changed network policy/version invalidates baseline comparisons.
+
+## Shared supervisor increment
+
+Contained CLI runs now use the FIFO supervisor documented in AUDIT-QUEUE.md. Optional private lifecycle journal, bounded admissions/reservations, cancellation through cleanup, exclusive ownership and interrupted-on-reopen semantics are implemented. This is a per-instance foundation; cross-process budgets, automatic orphan recovery and independent security review remain gates before an audit-execution UI.

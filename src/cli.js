@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {createAuditQueue} from './audit-queue.js';
 import {auditPageInDocker} from './docker-audit.js';
 import { createReviewTemplate, attachManualReview } from './manual-review-service.js';
 import { readConfiguration } from './project.js';
@@ -23,7 +24,7 @@ function usage() {
   console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
   console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
   console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
-  console.log('Experimental Docker audit: --project config.json --isolation-image sha256:... (prebuilt local worker image required)');
+  console.log('Experimental Docker audit: --project config.json --isolation-image sha256:... (prebuilt local worker image required; optional --job-store directory)');
   console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
   console.log('Manual template: --project config.json --review-template saved.json [--output review.json]');
   console.log('Attach manual review: --project config.json --review-audit saved.json --manual-review review.json --history directory');
@@ -33,10 +34,11 @@ export async function main(args=process.argv.slice(2)) {
   let opts;
   try {opts=parse(args);} catch(err) {console.error(err.message);usage();return 2;}
   if(opts.help) {usage();return 0;}
+  let queue;
   const controller = new AbortController();
   const cancel = () => controller.abort();
   process.once('SIGINT', cancel);
-  if(opts.serveHistory) process.once('SIGTERM', cancel);
+  process.once('SIGTERM', cancel);
   try {
     if (opts.serveHistory) {
       const selection=opts.workspace ? {workspace:await loadWorkspace(opts.workspace)} : {project:await loadProject(opts.project)};
@@ -77,7 +79,8 @@ export async function main(args=process.argv.slice(2)) {
       if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
       const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
       const sessionState=opts['session-state']?await loadSessionState(opts['session-state'],project):undefined;
-      const run = await auditProject(project, {signal:controller.signal,sessionState,...(opts['isolation-image']?{audit:(url,options)=>auditPageInDocker(url,{...options,imageId:opts['isolation-image']})}:{})});
+      if(opts['isolation-image']) queue=await createAuditQueue({directory:opts['job-store']});
+      const run = await auditProject(project, {signal:controller.signal,sessionState,...(opts['isolation-image']?{audit:(url,options)=>queue.submit(signal=>auditPageInDocker(url,{...options,signal,imageId:opts['isolation-image']}),{signal:options.signal})}:{})});
       if (baseline) run.comparison = compareAudits(baseline, run);
       if (opts.history) { const id = await saveHistory(opts.history, run); console.error(`History saved: ${id}`); }
       const output = renderProject(run, opts.format);
@@ -96,7 +99,11 @@ export async function main(args=process.argv.slice(2)) {
     else console.log(output);
     return opts.fail && report.violations.length>0?1:0;
   } catch(err) {console.error(`Audit failed: ${err.message}`);return 2;}
-  finally { process.removeListener('SIGINT', cancel); if(opts.serveHistory) process.removeListener('SIGTERM', cancel); }
+  finally {
+    try { if(queue) await queue.close(); }
+    catch { console.error('Audit queue shutdown failed; inspect the job store before retrying'); return 2; }
+    finally { process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel); }
+  }
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   process.exitCode=await main();
