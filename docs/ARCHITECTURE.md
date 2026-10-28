@@ -53,3 +53,6 @@ LOCAL-SERVICE-REVIEW.md records the internal review, existing boundaries and unr
 
 
 Seguimiento / Follow-up: [REPORT-RENDERING.md](REPORT-RENDERING.md) describe separación de renderizado en procesos desechables. La lectura/validación inicial permanece en el anfitrión; la puerta P1 de recursos no se considera cerrada.
+
+
+Actualización 2026-10-28 / Update: [HISTORY-SOURCE-ISOLATION.md](HISTORY-SOURCE-ISOLATION.md) sustituye el estado anterior de parse/validación inicial en el padre para detalles, comparaciones, tendencias y exportaciones del visor. La captura de fuentes queda bajo bloqueo en el padre y la validación pasa al hijo después de liberar el bloqueo; permanecen los límites de I/O, serialización, RSS y muerte abrupta del padre.

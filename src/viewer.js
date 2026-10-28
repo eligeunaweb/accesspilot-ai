@@ -3,7 +3,7 @@ import {checkViewerRequest,createLocalServiceGuard} from './local-service-guard.
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { validateProject } from './project.js';
-import { listHistory, readHistory, projectKey, historyWindow } from './history.js';
+import { listHistory, readHistorySource, projectKey, historySourceWindow } from './history.js';
 import { validateWorkspace } from './workspace.js';
 import { historyFilters, filterHistory } from './history-filter.js';
 import { evidenceFilters } from './evidence-filter.js';
@@ -87,22 +87,22 @@ export async function startHistoryViewer({root, project:input, workspace:workspa
       if((run && (before||after||page)) || (!!before!==!!after) || ((before||after)&&page) || (page!==null&&!/^[1-9]\d{0,5}$/.test(page))) {reject(400);return;}
       let title=t.history,body='';
       if(run) {
-        const [snapshot]=await readHistory(root,project,[run]);title=t.run;
+        const records=await readHistorySource(root,project,[run]),expectedKey=projectKey(project);title=t.run;
         if(download) {
           const shared=download.startsWith('share-'),format=shared?download.slice(6):download;
-          const output=await render('export',{snapshot,format,lang,shared});
+          const output=await render('export',{records,expectedKey,format,lang,shared});
           const type={json:'application/json',html:'text/html',csv:'text/csv'}[format];
           reply(200,{'Content-Type':`${type}; charset=utf-8`,'Content-Disposition':`attachment; filename="accesspilot-${shared?'shared-summary':'evidence'}.${format}"`},output);return;
         }
         const downloads=['json','html','csv'].map(format=>`<a href="${escape(query(base,lang,{run,download:format}))}">${lang==='es'?'Descargar evidencia':'Download evidence'} ${format.toUpperCase()}</a>`).join(' · ');
         const sharedDownloads=['json','html','csv'].map(format=>`<a href="${escape(query(base,lang,{run,download:'share-'+format}))}">${lang==='es'?'Resumen para compartir':'Shared summary'} ${format.toUpperCase()}</a>`).join(' · ');
-        body=`<p class="run-id">${escape(run)}</p><p>${downloads}</p><p>${sharedDownloads}</p><p>${lang==='es'?'Los resúmenes reducen datos sensibles; revísalos antes de compartir. No sustituyen la evidencia original.':'Summaries reduce sensitive data; review before sharing. They do not replace original evidence.'}</p>${await render('detail',{snapshot,evidence,lang,base,run})}`;
+        body=`<p class="run-id">${escape(run)}</p><p>${downloads}</p><p>${sharedDownloads}</p><p>${lang==='es'?'Los resúmenes reducen datos sensibles; revísalos antes de compartir. No sustituyen la evidencia original.':'Summaries reduce sensitive data; review before sharing. They do not replace original evidence.'}</p>${await render('detail',{records,expectedKey,evidence,lang,base,run})}`;
       } else if(before&&after) {
-        const snapshots=await readHistory(root,project,[before,after]);title=t.result;
-        body=`<p class="run-id">${escape(t.before)}: ${escape(before)}<br>${escape(t.after)}: ${escape(after)}</p>${await render('compare',{snapshots,lang})}`;
+        const records=await readHistorySource(root,project,[before,after]),expectedKey=projectKey(project);title=t.result;
+        body=`<p class="run-id">${escape(t.before)}: ${escape(before)}<br>${escape(t.after)}: ${escape(after)}</p>${await render('compare',{records,expectedKey,lang})}`;
       } else if(view==='trends') {
         title=lang==='es'?'Tendencias del historial':'History trends';
-        body=await render('trends',{window:await historyWindow(root,project),lang,base});
+        body=await render('trends',{sourceWindow:await historySourceWindow(root,project),expectedKey:projectKey(project),lang,base});
       } else {
         const all=await listHistory(root,project),ids=filterHistory(all,filters),offset=(Number(page??1)-1)*50;
         if(offset>0&&offset>=ids.length) {reject(404);return;}
