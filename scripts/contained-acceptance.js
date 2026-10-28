@@ -66,7 +66,9 @@ try {
     directory:join(root,'managed-jobs'),resourceDirectory:join(root,'resources'),historyRoot:join(root,'managed-history'),imageId,
     sessionStates:{[projectKey(project)]:sessionState}}, {createSupervisor:async options=>managed=await createWebJobSupervisor(options)});
   try {
-    const credentials=transport.openSession(),body=JSON.stringify({schemaVersion:1,projectId:transport.projects()[0].id,requestId:'00000000-0000-4000-8000-000000000001'});
+    const {code}=transport.createPairingCode(),pair=()=>fetch(transport.origin+'/api/v1/session',{method:'POST',headers:{origin:transport.origin,'content-type':'application/json'},body:JSON.stringify({schemaVersion:1,pairingCode:code})});
+    const paired=await pair();assert.equal(paired.status,200);const credentials=await paired.json();assert.equal((await pair()).status,403);checks.httpPairingOneUse=true;
+    const body=JSON.stringify({schemaVersion:1,projectId:credentials.projects[0].id,requestId:'00000000-0000-4000-8000-000000000001'});
     const headers={origin:transport.origin,authorization:'Bearer '+credentials.token,'x-accesspilot-csrf':credentials.csrf,'content-type':'application/json'};
     assert.equal((await fetch(transport.origin+'/api/v1/jobs',{method:'POST',headers:{...headers,origin:'https://foreign.example'},body})).status,403);
     checks.httpCommandsSecured=true;
@@ -76,6 +78,8 @@ try {
     const status=await fetch(transport.origin+'/api/v1/jobs/'+one.id,{headers:{authorization:headers.authorization}});assert.equal(status.status,200);assert.equal((await status.json()).state,'succeeded');
     const foreign=transport.openSession();assert.equal((await fetch(transport.origin+'/api/v1/jobs/'+one.id,{headers:{authorization:'Bearer '+foreign.token}})).status,404);checks.httpStatusOwned=true;
     const managedSaved=await latestHistory(join(root,'managed-history'),project);assert.equal(managedSaved.pages[0].report.isolation.imageId,imageId);assert.equal(managedSaved.pages[0].report.journey.name,'open-dialog');checks.managedHistorySaved=true;
+    assert.equal((await fetch(transport.origin+'/api/v1/session/revoke',{method:'POST',headers,body:JSON.stringify({schemaVersion:1})})).status,200);
+    assert.equal((await fetch(transport.origin+'/api/v1/jobs/'+one.id,{headers:{authorization:headers.authorization}})).status,403);checks.httpSessionRevoked=true;
   } finally {await transport.close();}
   await assert.rejects(lstat(join(root,'resources','.resource-lock')),{code:'ENOENT'});checks.managedResourceReleased=true;
   stage='cleanup';assert.deepEqual(await dockerIds(),before);checks.ownedContainersRemoved=true;stage='complete';

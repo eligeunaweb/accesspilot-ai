@@ -13,7 +13,7 @@ export function validateJobOrigin(origin) {
   return url.host;
 }
 export function checkJobEnvelope(req,origin,action) {
-  if(!['create','cancel','status'].includes(action))throw jobRequestError();
+  if(!['create','cancel','status','revoke'].includes(action))throw jobRequestError();
   const h=req.headers??{},seen=new Set();
   const single=new Set(['host','origin','authorization','x-accesspilot-csrf','sec-fetch-site','content-type','content-encoding','content-length','transfer-encoding','expect','upgrade']);
   if(!Array.isArray(req.rawHeaders)||req.rawHeaders.length%2)throw jobRequestError();

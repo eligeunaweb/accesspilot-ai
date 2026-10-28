@@ -3,6 +3,7 @@ import {performance} from 'node:perf_hooks';
 import {validateWorkspace} from './workspace.js';
 import {projectKey} from './history.js';
 import {checkJobEnvelope,equalSecret,jobIdPattern,jobRequestError,parseWebJobCommand,validateJobOrigin} from './web-job-request.js';
+import {parseSessionRevocation} from './web-job-bootstrap.js';
 
 // Internal admission model only. No HTTP listener, audit runner, Docker or filesystem writes.
 export function createWebJobContract({workspace:input,origin,maxOutstanding=8,maxRecords=128,maxSessions=16,sessionMs=3600000}, {now=()=>performance.now()}={}) {
@@ -60,6 +61,11 @@ export function createWebJobContract({workspace:input,origin,maxOutstanding=8,ma
       if(job.state==='requested'){job.state='cancelled';job.controller.abort();}
       else if(job.state==='running'){job.state='cancelling';job.controller.abort();}
       return view(job);
+    },
+    endSession(permit,body) {
+      const p=consume(permit,'revoke');
+      if(!Buffer.isBuffer(body)||body.length!==p.bytes)throw jobRequestError();
+      parseSessionRevocation(body);revoke(p.session);return {revoked:true};
     },
     // Trusted future adapter methods. Never expose through request bodies or RPC dispatch.
     describe(id) {

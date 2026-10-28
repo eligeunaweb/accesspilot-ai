@@ -89,6 +89,7 @@ export async function createWebJobSupervisor({workspace:input,origin,directory,r
       pump();return visible(receipt.id);
     },
     revokeSession(credentials){contract.revokeSession(credentials);pump();},
+    endSession(permit,body){const result=contract.endSession(permit,body);pump();return result;},
     inspect(){return {closed,failed:fatal,activeProjects:active,admissions:store.snapshot(),queue:queue.snapshot()};},
     wait(id){const ticket=tickets.get(id);if(!ticket)throw jobRequestError(404);return ticket.done;},
     close() {
