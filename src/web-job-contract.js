@@ -1,4 +1,4 @@
-import {randomBytes,randomUUID} from 'node:crypto';
+import {createHash,randomBytes,randomUUID} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {validateWorkspace} from './workspace.js';
 import {projectKey} from './history.js';
@@ -62,6 +62,16 @@ export function createWebJobContract({workspace:input,origin,maxOutstanding=8,ma
       return view(job);
     },
     // Trusted future adapter methods. Never expose through request bodies or RPC dispatch.
+    describe(id) {
+      const job=jobs.get(id);if(!job)throw jobRequestError(404);
+      const project=projects.get(job.projectId),hash=value=>createHash('sha256').update(value).digest('hex');
+      return {receipt:view(job),project:structuredClone(project),signal:job.controller.signal,
+        owner:hash(job.owner.token),request:hash(job.requestId),fingerprint:hash(JSON.stringify(project))};
+    },
+    failAdmission(id) {
+      const job=jobs.get(id);if(!job||job.state!=='requested')throw jobRequestError(409);
+      job.state='failed';job.controller.abort();return view(job);
+    },
     take(id) {
       sweep();const job=jobs.get(id);if(closed||failed||!job||job.state!=='requested')throw jobRequestError(409);
       job.state='running';return {project:structuredClone(projects.get(job.projectId)),signal:job.controller.signal};
