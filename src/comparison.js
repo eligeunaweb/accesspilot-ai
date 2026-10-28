@@ -91,7 +91,8 @@ export function upgradeSnapshot(input) {
   if(input?.historyVersion!==undefined&&![1,2,3].includes(input.historyVersion)) throw new Error('Unsupported historyVersion');
   return validateSnapshot({...input,historyVersion:input.historyVersion===3?3:2});
 }
-export async function loadSnapshot(path, {enrich=false}={}) {
+// Raw bounded bytes for trusted consumers; no JSON/schema validation here.
+export async function readSnapshotBytes(path) {
   const file=await open(path,'r');
   try {
     if (!(await file.stat()).isFile()) throw new Error('Snapshot must be a file');
@@ -101,12 +102,20 @@ export async function loadSnapshot(path, {enrich=false}={}) {
       if(!bytesRead) break;size+=bytesRead;
     }
     if(size>MAX_SNAPSHOT_BYTES) throw new Error('Snapshot exceeds 20 MiB');
-    let input;
-    try {input=JSON.parse(buffer.subarray(0,size).toString('utf8').replace(/^\uFEFF/,''));}
-    catch {throw new Error('Snapshot must contain valid JSON');}
-    return enrich?upgradeSnapshot(input):validateSnapshot(input);
+    return buffer.subarray(0,size);
   } finally {await file.close();}
 }
+export function parseSnapshotBytes(buffer,{enrich=false}={}) {
+  if(!Buffer.isBuffer(buffer)||buffer.length>MAX_SNAPSHOT_BYTES)throw new Error('Snapshot exceeds 20 MiB');
+  let input;
+  try {input=JSON.parse(buffer.toString('utf8').replace(/^\uFEFF/,''));}
+  catch {throw new Error('Snapshot must contain valid JSON');}
+  return enrich?upgradeSnapshot(input):validateSnapshot(input);
+}
+export async function loadSnapshot(path, options={}) {
+  return parseSnapshotBytes(await readSnapshotBytes(path),options);
+}
+
 function findings(page) {
   const map=new Map();
   for (const rule of page.report.violations) for (const node of rule.nodes) {

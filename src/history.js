@@ -3,7 +3,7 @@ import { mkdir, open, rename, unlink, readdir, lstat, rmdir } from 'node:fs/prom
 import {acquireDirectoryLock} from './directory-lock.js';
 import { join, resolve } from 'node:path';
 import { validateProject } from './project.js';
-import { upgradeSnapshot, loadSnapshot } from './comparison.js';
+import { upgradeSnapshot, loadSnapshot, readSnapshotBytes } from './comparison.js';
 
 // Scope changes share a history; comparison itself decides which pages are comparable.
 export function projectKey(project) {
@@ -116,5 +116,34 @@ export async function pruneHistory(root, project, {keep, apply=false} = {}) {
     if (apply) for (const id of removed) await unlink(join(path, id));
     return {schemaVersion:1, kind:'history-retention', applied:apply, keep, retained,
       candidates:removed, deleted:apply ? removed : []};
+  });
+}
+
+
+// Private viewer transport: unvalidated source, never an HTTP download or canonical evidence.
+// Resolve all names under the retention lock and release it before child validation.
+export async function readHistorySource(root,project,ids) {
+  if(!Array.isArray(ids)||ids.length<1||ids.length>2||ids.some(id=>typeof id!=='string'))throw new Error('Expected one or two history IDs');
+  return locked(root,project,async path=>{
+    const available=new Set(await records(path));
+    if(ids.some(id=>!available.has(id))){const error=new Error('History record not found');error.code='HISTORY_NOT_FOUND';throw error;}
+    const source=[];
+    for(const id of ids)source.push((await readSnapshotBytes(join(path,id))).toString('base64'));
+    return source;
+  });
+}
+export async function historySourceWindow(root,project) {
+  return locked(root,project,async path=>{
+    const ids=await records(path),rows=[];let bytes=0;
+    for(const id of ids.slice(0,10)) {
+      try {
+        const file=join(path,id);
+        if(bytes+(await lstat(file)).size>40*1024*1024){rows.push({id,error:'budget'});continue;}
+        const buffer=await readSnapshotBytes(file);
+        if(bytes+buffer.length>40*1024*1024){rows.push({id,error:'budget'});continue;}
+        bytes+=buffer.length;rows.push({id,source:buffer.toString('base64')});
+      } catch {rows.push({id,error:'invalid'});}
+    }
+    return {total:ids.length,rows};
   });
 }
