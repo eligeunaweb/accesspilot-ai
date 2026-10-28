@@ -25,8 +25,9 @@ for(const language of ['es','en'])test(`browser pairing, keyboard/mobile control
     assert.deepEqual(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length})),{local:0,session:0});assert.deepEqual(await page.context().cookies(),[]);
     await page.locator('#start').focus();await page.keyboard.press('Enter');const signal=await ready;
     await page.locator('#jobs li').waitFor();assert.equal(supervisor.inspect().admissions.length,1);
-    await page.locator('#jobs button').first().click();assert.equal(signal.aborted,true);assert.equal(supervisor.inspect().queue.active,1);
-    await page.getByText(language==='es'?'Cancelando: limpieza pendiente':'Cancelling: cleanup pending',{exact:true}).waitFor();release();
+    await page.locator('#jobs button').first().click();
+    await page.getByText(language==='es'?'Cancelando: limpieza pendiente':'Cancelling: cleanup pending',{exact:true}).waitFor();
+    assert.equal(signal.aborted,true);assert.equal(supervisor.inspect().queue.active,1);release();
     await page.locator('#jobs button.secondary').click();await page.getByText(language==='es'?'Cancelada':'Cancelled',{exact:true}).waitFor();
     assert.deepEqual((await new AxeBuilder({page}).analyze()).violations.map(v=>v.id),[]);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.ok(urls.every(url=>!url.includes(code)&&!url.includes('?')));
