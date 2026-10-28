@@ -9,3 +9,9 @@ pagina-prueba.html
 *.bak
 *.log
 .env
+.accesspilot-history/
+
+.accesspilot-auth/
+playwright/.auth/
+
+.accesspilot-jobs/

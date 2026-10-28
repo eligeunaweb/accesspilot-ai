@@ -1,0 +1,3 @@
+worker/seccomp-profile.json text eol=lf
+worker/apparmor.profile text eol=lf
+worker/Dockerfile text eol=lf

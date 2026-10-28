@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "name": "Restricted site audit",
+  "language": "en",
+  "urls": ["https://example.com/"],
+  "concurrency": 2,
+  "timeoutMs": 30000,
+  "crawl": {
+    "maxPages": 20,
+    "maxDepth": 2,
+    "maxDurationMs": 120000,
+    "followFragments": false
+  },
+  "network": {
+    "resourceOrigins": [],
+    "allowPrivateOrigins": [],
+    "allowedPorts": [80, 443]
+  }
+}

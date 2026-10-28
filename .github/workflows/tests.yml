@@ -1,18 +1,91 @@
 name: Tests
 on: [push, pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        node: [20, 22]
+        os: [ubuntu-latest, windows-latest, macos-15-intel]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 20
+      - name: Permit Chromium user namespaces on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          node scripts/ci-apparmor.js
+          sudo apparmor_parser -r "$RUNNER_TEMP/accesspilot-playwright-userns"
       - run: npm test
+        timeout-minutes: 5
+      - run: npm audit --audit-level=high
+  isolation-prerequisite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve test image to an immutable local ID
+        run: docker pull node:22-alpine
+      - name: Test OS network and resource prerequisites
+        run: |
+          image_id="$(docker image inspect node:22-alpine --format '{{.Id}}')"
+          node scripts/isolation-probe.js --image "$image_id" --output isolation-result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolation-prerequisite
+          path: isolation-result.json
+          if-no-files-found: ignore
+
+  contained-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Load scoped container AppArmor profile
+        run: sudo apparmor_parser -r worker/apparmor.profile
+      - name: Build versioned acceptance worker
+        run: docker build --file worker/Dockerfile --tag accesspilot-worker:ci .
+        timeout-minutes: 15
+      - name: Audit real pages through contained Chromium and stdio mediator
+        run: |
+          image_id="$(docker image inspect accesspilot-worker:ci --format '{{.Id}}')"
+          node scripts/contained-acceptance.js --image "$image_id" --output contained-result.json
+        timeout-minutes: 7
+      - name: Recover killed supervisor and controlled OOM workers
+        run: |
+          image_id="$(docker image inspect accesspilot-worker:ci --format '{{.Id}}')"
+          node scripts/worker-recovery-acceptance.js --image "$image_id" --output worker-recovery-result.json
+        timeout-minutes: 5
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contained-browser
+          path: |
+            contained-result.json
+            worker-recovery-result.json
+          if-no-files-found: ignore

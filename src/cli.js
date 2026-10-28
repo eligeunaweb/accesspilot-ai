@@ -1,39 +1,124 @@
 #!/usr/bin/env node
-import { chromium } from 'playwright';
-import AxeBuilder from '@axe-core/playwright';
+import {renderShareReport} from './share-report.js';
+import {createAuditQueue} from './audit-queue.js';
+import {auditPageInDocker} from './docker-audit.js';
+import { createReviewTemplate, attachManualReview } from './manual-review-service.js';
+import { readConfiguration } from './project.js';
+import { loadSessionState } from './session.js';
+import { auditPage } from './audit.js';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 import { writeFile } from 'node:fs/promises';
-import { htmlReport, summarize } from './report.js';
+import { htmlReport, csvReport } from './report.js';
 import { parse } from './args.js';
+import { loadProject } from './project.js';
+import { auditProject, projectExitCode } from './runner.js';
+import { renderProject } from './project-report.js';
+import { compareAudits, loadSnapshot } from './comparison.js';
+import { messages } from './i18n.js';
+import { saveHistory, latestHistory, listHistory, pruneHistory, projectKey } from './history.js';
+import { startHistoryViewer } from './viewer.js';
+import { loadWorkspace } from './workspace.js';
 
 function usage() {
-  console.log('Usage: accesspilot <http(s) URL> [--format text|json|html] [--output filename] [--fail-on-violations]');
+  console.log('Usage: accesspilot <http(s) URL> | --project config.json [--format text|json|html|csv] [--lang en|es] [--baseline prior.json|latest] [--history directory] [--list-history] [--output filename] [--fail-on-violations]');
+  console.log('Retention preview: --project config.json --history directory --prune-history --keep-runs N [--apply-retention]');
+  console.log('Local viewer: --project config.json --history directory --serve-history [--port 0]');
+  console.log('Project dashboard: --workspace workspace.json --history directory --serve-history [--lang en|es]');
+  console.log('Experimental Docker audit: --project config.json --isolation-image sha256:... (prebuilt local worker image required; optional --job-store directory --resource-store shared-directory)');
+  console.log('Authenticated audit: --project config.json --session-state .accesspilot-auth/member.json');
+  console.log('Manual template: --project config.json --review-template saved.json [--output review.json]');
+  console.log('Attach manual review: --project config.json --review-audit saved.json --manual-review review.json --history directory');
+  console.log('Share reduced-data summary: --share-report saved.json [--format text|json|html|csv] [--lang en|es] [--output NEW_FILE]');
+  console.log('Import evidence: --project config.json --history directory --import-history saved.json');
 }
 export async function main(args=process.argv.slice(2)) {
   let opts;
   try {opts=parse(args);} catch(err) {console.error(err.message);usage();return 2;}
   if(opts.help) {usage();return 0;}
-  let browser;
-  let context;
+  let queue;
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  process.once('SIGINT', cancel);
+  process.once('SIGTERM', cancel);
   try {
-    browser=await chromium.launch({headless:true});
-    context=await browser.newContext();
-    const page=await context.newPage();
-    await page.goto(opts.url,{waitUntil:'domcontentloaded',timeout:30000});
-    const results=await new AxeBuilder({page}).analyze();
-    const report=summarize(results,page.url());
-    const output=opts.format==='json'?JSON.stringify(report,null,2):opts.format==='html'?htmlReport(report):[
+    if(opts['share-report']) {
+      const output=renderShareReport(await loadSnapshot(opts['share-report'],{enrich:true}),opts.format,opts.lang);
+      if(opts.output) {
+        await writeFile(opts.output,output,{encoding:'utf8',flag:'wx',mode:0o600});
+        console.log('Reduced-data summary written');
+      } else console.log(output);
+      return 0;
+    }
+    if (opts.serveHistory) {
+      const selection=opts.workspace ? {workspace:await loadWorkspace(opts.workspace)} : {project:await loadProject(opts.project)};
+      if(opts.lang) (selection.workspace??selection.project).language=opts.lang;
+      const viewer = await startHistoryViewer({root:opts.history, ...selection, port:opts.port});
+      console.log(`AccessPilot AI: ${viewer.url}`);
+      console.error('Read-only local history. Stop with Ctrl+C. Keep the session URL private.');
+      try {
+        if(!controller.signal.aborted) await new Promise(resolve=>controller.signal.addEventListener('abort',resolve,{once:true}));
+      } finally { await viewer.close(); }
+      return 0;
+    }
+    if (opts.project) {
+      const project = await loadProject(opts.project);
+      if (opts.lang) project.language = opts.lang;
+      if(opts['isolation-image'])project.network??={};
+      if(opts['review-template']||opts['manual-review']) {
+        const snapshot=await loadSnapshot(opts['review-template']??opts['review-audit'],{enrich:true});
+        if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Manual review audit belongs to another project');
+        if(opts['review-template']) {
+          const output=JSON.stringify(createReviewTemplate(snapshot),null,2);
+          if(opts.output) {await writeFile(opts.output,output,{encoding:'utf8',flag:'wx',mode:0o600});console.log('Manual review template written');}
+          else console.log(output);
+        } else {
+          const reviewed=attachManualReview(snapshot,await readConfiguration(opts['manual-review'],'Manual review'));
+          const id=await saveHistory(opts.history,reviewed);
+          console.log(JSON.stringify({schemaVersion:1,kind:'manual-review-import',id}));
+        }
+        return 0;
+      }
+      if(opts['import-history']) {
+        const snapshot=await loadSnapshot(opts['import-history'],{enrich:true});
+        if(projectKey(snapshot.project)!==projectKey(project)) throw new Error('Imported history belongs to another project');
+        const id=await saveHistory(opts.history,snapshot);
+        console.log(JSON.stringify({schemaVersion:1,kind:'history-import',id}));return 0;
+      }
+      if (opts.listHistory) { console.log(JSON.stringify(await listHistory(opts.history, project), null, 2)); return 0; }
+      if (opts.pruneHistory) { console.log(JSON.stringify(await pruneHistory(opts.history, project, {keep:opts.keepRuns, apply:opts.applyRetention ?? false}), null, 2)); return 0; }
+      const baseline = opts.baseline==='latest' ? await latestHistory(opts.history, project) : opts.baseline ? await loadSnapshot(opts.baseline) : null;
+      const sessionState=opts['session-state']?await loadSessionState(opts['session-state'],project):undefined;
+      if(opts['isolation-image']) queue=await createAuditQueue({directory:opts['job-store'],resourceDirectory:opts['resource-store']});
+      const audit=queue ? (url,options)=>queue.submit(
+        (signal,{workerLifecycle})=>auditPageInDocker(url,
+          {...options,signal,imageId:opts['isolation-image']},{lifecycle:workerLifecycle}),
+        {signal:options.signal}) : undefined;
+      const run = await auditProject(project, {signal:controller.signal,sessionState,...(audit?{audit}:{})});
+      if (baseline) run.comparison = compareAudits(baseline, run);
+      if (opts.history) { const id = await saveHistory(opts.history, run); console.error(`History saved: ${id}`); }
+      const output = renderProject(run, opts.format);
+      if(opts.output) { await writeFile(opts.output, output, 'utf8'); console.log(`Report written to ${opts.output}`); }
+      else console.log(output);
+      return projectExitCode(run, opts.fail);
+    }
+    const report=await auditPage(opts.url, {signal:controller.signal, language:opts.lang});
+    const output=opts.format==='json'?JSON.stringify(report,null,2):opts.format==='html'?htmlReport(report):opts.format==='csv'?csvReport(report):[
       `AccessPilot AI v0.1.0 | ${report.url}`,
-      `${report.violations.length} violated rules; ${report.incomplete} checks need review`,
-      ...report.violations.map(v=>`${v.impact.toUpperCase()} ${v.id}: ${v.help} (${v.nodes.length} elements)`),
+      `${report.violations.length} ${messages[report.language].rules.toLowerCase()}; ${report.incomplete} ${messages[report.language].review.toLowerCase()}`,
+      ...report.violations.map(v=>`${v.impact.toUpperCase()} ${v.id}: ${v.help} (${v.nodes.length} elements)\n${v.recommendation.correction}\n${v.recommendation.verification}`),
       report.disclaimer
     ].join('\n');
     if(opts.output) {await writeFile(opts.output,output,'utf8');console.log(`Report written to ${opts.output}`);}
     else console.log(output);
     return opts.fail && report.violations.length>0?1:0;
   } catch(err) {console.error(`Audit failed: ${err.message}`);return 2;}
-  finally {if(context) await context.close();
-    if(browser) await browser.close();}
+  finally {
+    try { if(queue) await queue.close(); }
+    catch { console.error('Audit queue shutdown failed; inspect the job store before retrying'); return 2; }
+    finally { process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel); }
+  }
 }
-if(process.argv[1] && import.meta.url===new URL(`file://${process.argv[1].replace(/\\/g,'/')}`).href) {
+if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   process.exitCode=await main();
 }
