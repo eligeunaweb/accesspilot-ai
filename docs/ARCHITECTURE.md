@@ -66,3 +66,8 @@ Contrato interno / Internal contract: [WEB-JOB-CONTRACT.md](WEB-JOB-CONTRACT.md)
 
 
 Adaptador interno / Internal adapter: [WEB-JOB-SUPERVISOR.md](WEB-JOB-SUPERVISOR.md) conecta admisión persistente, cola de páginas, dominio obligatorio e historial. No añade listener ni recupera sesiones de navegador; los recibos interrumpidos nunca se repiten automáticamente y siguen pendientes el transporte de producto y la revisión independiente.
+
+
+## Browser pairing and execution controls
+
+[BROWSER-JOBS.md](BROWSER-JOBS.md) adds operator-issued, bounded, two-minute single-use pairing capabilities and closed session exchange/revocation routes. Static ES/EN browser controls keep credentials in memory, select allowlisted projects, preserve request IDs on lost replies, poll boundedly, cancel and disconnect. Revocation consumes an action-bound permit after the body is read. This supersedes the earlier missing bootstrap/UI statement only for explicitly started internal services. The existing viewer is read-only; operator CLI launch, report integration, durable client recovery, independent review and OS host limits remain open.

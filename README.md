@@ -238,4 +238,4 @@ Reduced-data sharing / Resúmenes con datos reducidos: `--share-report audit.jso
 
 Shared container reservations / Reservas entre procesos: add `--resource-store resources/shared` to contained audits with `--job-store`. One supervisor owns each explicit domain; see [coordination and recovery / coordinación y recuperación](docs/SHARED-RESOURCES.md).
 
-Internal local job API / API local interna de trabajos: [HTTP transport, authentication and limits / transporte HTTP, autenticación y límites](docs/WEB-JOB-TRANSPORT.md). Explicit operator startup only; browser credential bootstrap and execution UI are pending. The history viewer remains read-only.
+Internal local job API / API local interna de trabajos: [HTTP transport, authentication and limits / transporte HTTP, autenticación y límites](docs/WEB-JOB-TRANSPORT.md). Explicit operator startup only. [Browser connection and audit controls / conexión y controles web](docs/BROWSER-JOBS.md) use private one-use pairing codes and memory-only credentials. The history viewer remains read-only; an integrated operator CLI launcher is pending.
