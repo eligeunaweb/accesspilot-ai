@@ -56,3 +56,6 @@ Seguimiento / Follow-up: [REPORT-RENDERING.md](REPORT-RENDERING.md) describe sep
 
 
 Actualización 2026-10-28 / Update: [HISTORY-SOURCE-ISOLATION.md](HISTORY-SOURCE-ISOLATION.md) sustituye el estado anterior de parse/validación inicial en el padre para detalles, comparaciones, tendencias y exportaciones del visor. La captura de fuentes queda bajo bloqueo en el padre y la validación pasa al hijo después de liberar el bloqueo; permanecen los límites de I/O, serialización, RSS y muerte abrupta del padre.
+
+
+Contrato interno / Internal contract: [WEB-JOB-CONTRACT.md](WEB-JOB-CONTRACT.md) describe solicitudes permitidas, credenciales, permisos de un uso y cancelación con limpieza confirmada. Es un modelo sin ejecución ni rutas HTTP de producto; las puertas de transporte, cola durable, recursos y revisión independiente siguen abiertas.
