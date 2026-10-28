@@ -1,4 +1,5 @@
 import {createWebJobSupervisor} from '../src/web-job-supervisor.js';
+import {startWebJobTransport} from '../src/web-job-transport.js';
 import https from 'node:https';
 import {createRequestMediator} from '../src/request-mediator.js';
 import assert from 'node:assert/strict';
@@ -60,16 +61,22 @@ try {
   const journal=JSON.parse(await readFile(join(root,'jobs','jobs.json'),'utf8'));assert.equal(journal.records.length,1);assert.equal(journal.records[0].state,'succeeded');checks.queueJournal=true;
   await assert.rejects(lstat(join(root,'resources','.resource-lock')),{code:'ENOENT'});await assert.rejects(lstat(join(root,'jobs','resource-lease.json')),{code:'ENOENT'});checks.sharedResourceReleased=true;
   stage='managed-admission';
-  const managed=await createWebJobSupervisor({workspace:{schemaVersion:1,name:'Managed fixture',projects:[project]},origin,
+  let managed;
+  const transport=await startWebJobTransport({workspace:{schemaVersion:1,name:'Managed fixture',projects:[project]},
     directory:join(root,'managed-jobs'),resourceDirectory:join(root,'resources'),historyRoot:join(root,'managed-history'),imageId,
-    sessionStates:{[projectKey(project)]:sessionState}});
+    sessionStates:{[projectKey(project)]:sessionState}}, {createSupervisor:async options=>managed=await createWebJobSupervisor(options)});
   try {
-    const credentials=managed.openSession(),body=Buffer.from(JSON.stringify({schemaVersion:1,projectId:managed.projects()[0].id,requestId:'00000000-0000-4000-8000-000000000001'}));
-    const submit=()=>{const headers={host:new URL(origin).host,origin,authorization:'Bearer '+credentials.token,'x-accesspilot-csrf':credentials.csrf,'content-type':'application/json','content-length':String(body.length)};return managed.submit(managed.authorize({method:'POST',headers,rawHeaders:Object.entries(headers).flat()},'create'),body);};
+    const credentials=transport.openSession(),body=JSON.stringify({schemaVersion:1,projectId:transport.projects()[0].id,requestId:'00000000-0000-4000-8000-000000000001'});
+    const headers={origin:transport.origin,authorization:'Bearer '+credentials.token,'x-accesspilot-csrf':credentials.csrf,'content-type':'application/json'};
+    assert.equal((await fetch(transport.origin+'/api/v1/jobs',{method:'POST',headers:{...headers,origin:'https://foreign.example'},body})).status,403);
+    checks.httpCommandsSecured=true;
+    const submit=async()=>{const response=await fetch(transport.origin+'/api/v1/jobs',{method:'POST',headers,body});assert.equal(response.status,202);return response.json();};
     const [one,two]=await Promise.all([submit(),submit()]);assert.equal(one.id,two.id);assert.equal((await managed.wait(one.id)).state,'succeeded');
     assert.equal(managed.inspect().queue.records.length,1);checks.managedWebAdmission=true;
+    const status=await fetch(transport.origin+'/api/v1/jobs/'+one.id,{headers:{authorization:headers.authorization}});assert.equal(status.status,200);assert.equal((await status.json()).state,'succeeded');
+    const foreign=transport.openSession();assert.equal((await fetch(transport.origin+'/api/v1/jobs/'+one.id,{headers:{authorization:'Bearer '+foreign.token}})).status,404);checks.httpStatusOwned=true;
     const managedSaved=await latestHistory(join(root,'managed-history'),project);assert.equal(managedSaved.pages[0].report.isolation.imageId,imageId);assert.equal(managedSaved.pages[0].report.journey.name,'open-dialog');checks.managedHistorySaved=true;
-  } finally {await managed.close();}
+  } finally {await transport.close();}
   await assert.rejects(lstat(join(root,'resources','.resource-lock')),{code:'ENOENT'});checks.managedResourceReleased=true;
   stage='cleanup';assert.deepEqual(await dockerIds(),before);checks.ownedContainersRemoved=true;stage='complete';
 } catch(error) {failure={message:error.message,cause:error.cause?.message};}
