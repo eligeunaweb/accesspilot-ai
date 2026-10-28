@@ -1,3 +1,4 @@
+import {createWebJobSupervisor} from '../src/web-job-supervisor.js';
 import https from 'node:https';
 import {createRequestMediator} from '../src/request-mediator.js';
 import assert from 'node:assert/strict';
@@ -12,7 +13,7 @@ import {gzipSync} from 'node:zlib';
 import {auditPageInDocker} from '../src/docker-audit.js';
 import {immutableImage} from '../src/isolation.js';
 import {auditProject} from '../src/runner.js';
-import {saveHistory,latestHistory} from '../src/history.js';
+import {saveHistory,latestHistory,projectKey} from '../src/history.js';
 import {validateSnapshot} from '../src/comparison.js';
 
 const args=process.argv.slice(2);if(args.length!==4||args[0]!=='--image'||args[2]!=='--output')throw new Error('Usage: node scripts/contained-acceptance.js --image sha256:... --output NEW_RESULT.json');
@@ -58,6 +59,18 @@ try {
   await execute(process.execPath,['src/cli.js','--project',file,'--isolation-image',imageId,'--job-store',join(root,'jobs'),'--resource-store',join(root,'resources'),'--format','json','--output',output],{timeout:60000,maxBuffer:65536,windowsHide:true,shell:false});const cli=JSON.parse(await readFile(output,'utf8'));assert.equal(cli.totals.succeeded,1);assert.equal(cli.pages[0].report.isolation.imageId,imageId);checks.cli=true;
   const journal=JSON.parse(await readFile(join(root,'jobs','jobs.json'),'utf8'));assert.equal(journal.records.length,1);assert.equal(journal.records[0].state,'succeeded');checks.queueJournal=true;
   await assert.rejects(lstat(join(root,'resources','.resource-lock')),{code:'ENOENT'});await assert.rejects(lstat(join(root,'jobs','resource-lease.json')),{code:'ENOENT'});checks.sharedResourceReleased=true;
+  stage='managed-admission';
+  const managed=await createWebJobSupervisor({workspace:{schemaVersion:1,name:'Managed fixture',projects:[project]},origin,
+    directory:join(root,'managed-jobs'),resourceDirectory:join(root,'resources'),historyRoot:join(root,'managed-history'),imageId,
+    sessionStates:{[projectKey(project)]:sessionState}});
+  try {
+    const credentials=managed.openSession(),body=Buffer.from(JSON.stringify({schemaVersion:1,projectId:managed.projects()[0].id,requestId:'00000000-0000-4000-8000-000000000001'}));
+    const submit=()=>{const headers={host:new URL(origin).host,origin,authorization:'Bearer '+credentials.token,'x-accesspilot-csrf':credentials.csrf,'content-type':'application/json','content-length':String(body.length)};return managed.submit(managed.authorize({method:'POST',headers,rawHeaders:Object.entries(headers).flat()},'create'),body);};
+    const [one,two]=await Promise.all([submit(),submit()]);assert.equal(one.id,two.id);assert.equal((await managed.wait(one.id)).state,'succeeded');
+    assert.equal(managed.inspect().queue.records.length,1);checks.managedWebAdmission=true;
+    const managedSaved=await latestHistory(join(root,'managed-history'),project);assert.equal(managedSaved.pages[0].report.isolation.imageId,imageId);assert.equal(managedSaved.pages[0].report.journey.name,'open-dialog');checks.managedHistorySaved=true;
+  } finally {await managed.close();}
+  await assert.rejects(lstat(join(root,'resources','.resource-lock')),{code:'ENOENT'});checks.managedResourceReleased=true;
   stage='cleanup';assert.deepEqual(await dockerIds(),before);checks.ownedContainersRemoved=true;stage='complete';
 } catch(error) {failure={message:error.message,cause:error.cause?.message};}
 finally {for(const fixture of [server,forbidden,secure]){fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve));}}

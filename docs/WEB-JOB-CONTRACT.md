@@ -47,3 +47,6 @@ This is an internal admission model, not an enabled audit execution API or durab
 Running cancellation retains admission until trusted cleanup acknowledgement; uncertainty stops admission and retains interrupted work. Defaults: eight outstanding jobs, 128 total receipts, sixteen sessions and one-hour absolute lifetime. Internal limits can only decrease. No actual audits, containers, history writes or filesystem paths are accepted. The test-only HTTP server does not execute work.
 
 Production transport/bootstrap, durable queue/resource integration, crash recovery/idempotency, request rate/deadline limits, independent review and OS resource guarantees remain gates before connecting execution. Session access is workspace-wide, not multiuser RBAC. See per-head validation rather than treating this design as production acceptance.
+
+
+Adaptador interno / Internal adapter: [WEB-JOB-SUPERVISOR.md](WEB-JOB-SUPERVISOR.md) conecta admisión persistente, cola de páginas, dominio obligatorio e historial. No añade listener ni recupera sesiones de navegador; los recibos interrumpidos nunca se repiten automáticamente y siguen pendientes el transporte de producto y la revisión independiente.
