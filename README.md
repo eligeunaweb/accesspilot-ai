@@ -237,3 +237,5 @@ Contained audit scheduling / Cola de auditorías: optional `--job-store .accessp
 Reduced-data sharing / Resúmenes con datos reducidos: `--share-report audit.json --format html --lang es --output shared.html`, also available from the local viewer. See [privacy scope and limits / alcance y límites](docs/SHARING-REPORTS.md). Original evidence remains private and unchanged.
 
 Shared container reservations / Reservas entre procesos: add `--resource-store resources/shared` to contained audits with `--job-store`. One supervisor owns each explicit domain; see [coordination and recovery / coordinación y recuperación](docs/SHARED-RESOURCES.md).
+
+Internal local job API / API local interna de trabajos: [HTTP transport, authentication and limits / transporte HTTP, autenticación y límites](docs/WEB-JOB-TRANSPORT.md). Explicit operator startup only; browser credential bootstrap and execution UI are pending. The history viewer remains read-only.

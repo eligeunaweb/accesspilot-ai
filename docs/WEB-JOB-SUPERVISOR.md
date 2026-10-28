@@ -20,7 +20,7 @@ Cancelar una solicitud aún pendiente impide arrancar páginas. Cancelar un proy
 
 Si la cola indica limpieza no verificada, el proyecto queda interrupted, se revocan sesiones, se aborta el resto y se detiene la admisión. queue.close conserva las reservas/bloqueos según su contrato de recuperación. Un fallo de escritura del diario también detiene admisión; si no se creó ningún trabajador, el cierre puede liberar el dominio después de verificar la cola. Un error genérico no promete que se haya liberado un recurso desconocido.
 
-close cancela y espera admisiones/proyectos y cierra la cola. Debe esperarse esta promesa: el objeto no instala señales globales ni un servidor. Los métodos describe/failAdmission/take/settle/inspect/wait son internos, nunca deben exponerse por un despachador RPC genérico. El futuro transporte seguirá necesitando límites de cuerpo/cabeceras/frecuencia/plazos, bootstrap y router cerrado.
+close cancela y espera admisiones/proyectos y cierra la cola. Debe esperarse esta promesa: el objeto no instala señales globales ni un servidor. Los métodos describe/failAdmission/take/settle/inspect/wait son internos, nunca deben exponerse por un despachador RPC genérico. El transporte interno separado se documenta en [WEB-JOB-TRANSPORT.md](WEB-JOB-TRANSPORT.md); el bootstrap de navegador y su UI siguen pendientes.
 
 ## Reinicio e idempotencia: alcance exacto
 
@@ -36,7 +36,7 @@ Tests reales de archivos/cola/dominio y un hijo supervisor terminado por SIGKILL
 
 El harness contained-acceptance añade un proyecto autenticado con viewport/checkpoint usando el supervisor predeterminado y Chromium real en Docker, comprueba una sola tarea de página tras dos solicitudes equivalentes, historial con imagen/journey y liberación del dominio. Ese harness requiere Docker; su ejecución real se acredita solo con el resultado CI/operador, no editando el script. El test de SIGKILL local no mata un proyecto Docker; la recuperación de contenedores con muerte/OOM conserva su harness separado. No afirmar cobertura de todas las combinaciones de fallos.
 
-Los límites OS del anfitrión, limpieza de procesos de renderizado tras muerte abrupta, acceso a estado tras renovar sesión, archivo/rotación segura de recibos, fairness, UI/HTTP y revisión independiente siguen abiertos. Las credenciales de sesión y projectStates viven en memoria; no hay redacción retroactiva del historial privado ni garantía de anonimato de hashes.
+Los límites OS del anfitrión, limpieza de procesos de renderizado tras muerte abrupta, acceso a estado tras renovar sesión, archivo/rotación segura de recibos, fairness, UI/bootstrap de navegador y revisión independiente siguen abiertos. Las credenciales de sesión y projectStates viven en memoria; no hay redacción retroactiva del historial privado ni garantía de anonimato de hashes.
 
 ## English
 

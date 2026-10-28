@@ -60,5 +60,9 @@ Actualización 2026-10-28 / Update: [HISTORY-SOURCE-ISOLATION.md](HISTORY-SOURCE
 
 Contrato interno / Internal contract: [WEB-JOB-CONTRACT.md](WEB-JOB-CONTRACT.md) describe solicitudes permitidas, credenciales, permisos de un uso y cancelación con limpieza confirmada. Es un modelo sin ejecución ni rutas HTTP de producto; las puertas de transporte, cola durable, recursos y revisión independiente siguen abiertas.
 
+## Explicit internal job HTTP transport
+
+[WEB-JOB-TRANSPORT.md](WEB-JOB-TRANSPORT.md) now joins the persistent supervisor to a separately started IPv4 loopback service with three closed routes, Bearer/CSRF ownership, bounded incremental bodies, sockets, handlers, global rate and response/body deadlines. This supersedes the earlier missing internal transport statement. It adds no CLI activation or browser bootstrap; the existing viewer remains read-only. Operator credentials stay out of URLs. Awaited close holds cleanup ownership; expired responses do not release pending durable admission slots. Host-wide limits, browser execution UI and independent security review remain gates.
+
 
 Adaptador interno / Internal adapter: [WEB-JOB-SUPERVISOR.md](WEB-JOB-SUPERVISOR.md) conecta admisión persistente, cola de páginas, dominio obligatorio e historial. No añade listener ni recupera sesiones de navegador; los recibos interrumpidos nunca se repiten automáticamente y siguen pendientes el transporte de producto y la revisión independiente.
